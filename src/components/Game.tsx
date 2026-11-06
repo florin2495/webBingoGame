@@ -321,16 +321,19 @@ export function Game({ state, token, refresh }: Props) {
       {room.status === "finished" && state.reveal && <RevealedBoards state={state} />}
 
       <Card>
-        <div className="mb-2 flex items-baseline justify-between gap-2">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="font-bold">
             Numere strigate <span className="font-normal text-zinc-500">({called.length})</span>
           </h2>
           {playing && (
-            <span className="truncate text-sm">
-              Tura:{" "}
-              <strong className={myTurn ? "text-indigo-600 dark:text-indigo-400" : ""}>
-                {myTurn ? "tu" : (turnName ?? "—")}
-              </strong>
+            <span
+              className={`max-w-[55%] truncate rounded-lg border-2 px-2.5 py-1 text-sm ${
+                myTurn
+                  ? "animate-pulse border-indigo-600 bg-indigo-600 text-white"
+                  : "border-indigo-500 bg-indigo-50 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100"
+              }`}
+            >
+              Tura: <strong>{myTurn ? "tu" : (turnName ?? "—")}</strong>
             </span>
           )}
         </div>

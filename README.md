@@ -30,7 +30,7 @@ Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să n
   începe următorul jucător (rotație).
 - **Lista de camere:** în „Intră în cameră” vezi camerele deschise și intri direct. Camerele cu parolă au 🔒.
 - **Închidere automată:** o cameră în lobby, sau terminată, se închide după 2 minute în care nimeni nu o mai are deschisă (fiecare pagină deschisă trimite un semnal de prezență la 15 secunde). Jocurile în desfășurare nu se închid automat.
-- **Arată numerele ratate:** de 3 ori pe rundă, încercuiește cu galben, timp de 5 secunde, numerele strigate
+- **Arată numerele ratate:** de 5 ori pe rundă, încercuiește cu galben, timp de 5 secunde, numerele strigate
   pe care nu le-ai bifat. Dacă ești la zi, nu se consumă nicio utilizare.
 - **Confirmare la strigare:** o poți dezactiva. Atunci numărul apăsat pe tura ta se strigă imediat.
 - **Culori:** numerele strigate de tine sunt verde deschis, cele strigate de alții verde închis.

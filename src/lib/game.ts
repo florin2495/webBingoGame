@@ -20,7 +20,7 @@ export const PRESENCE_TOUCH_MS = 20_000;
 export function minutesLabel(n: number): string {
   return `${n} ${n >= 20 ? "de " : ""}${n === 1 ? "minut" : "minute"}`;
 }
-export const HINTS_PER_ROUND = 3;
+export const HINTS_PER_ROUND = 5;
 export const HINT_HIGHLIGHT_MS = 5000;
 
 export function isRoomExpired(status: string, lastActivityAt: string | Date, now = Date.now()): boolean {

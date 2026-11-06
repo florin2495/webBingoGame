@@ -37,7 +37,7 @@ create table if not exists public.players (
   token_hash text not null unique,
   is_host    boolean not null default false,
   ready      boolean not null default false,
-  hints_used smallint not null default 0 check (hints_used between 0 and 3), -- reset every round
+  hints_used smallint not null default 0 check (hints_used between 0 and 5), -- reset every round
   joined_at  timestamptz not null default now()
 );
 create unique index if not exists players_room_nickname_uq on public.players (room_id, lower(nickname));
