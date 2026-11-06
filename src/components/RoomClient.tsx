@@ -18,6 +18,7 @@ import { minutesLabel, NICKNAME_MAX, ROOM_IDLE_MINUTES } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
 import { Game } from "./Game";
 import { Lobby } from "./Lobby";
+import { SettingsPanel } from "./SettingsPanel";
 import { Button, Card, ErrorText, Field } from "./ui";
 
 const POLL_MS = 15_000;
@@ -138,6 +139,7 @@ function Room({ code, token }: { code: string; token: string }) {
       ) : (
         <Game state={state} token={token} refresh={refresh} />
       )}
+      <SettingsPanel />
       <LeaveButton state={state} token={token} />
     </main>
   );

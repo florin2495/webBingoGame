@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { PREF_CONFIRM_CALL, PREF_SOUND, useBoolPref } from "@/lib/client/prefs";
-import { countMarkedLines, countValidLines, HINT_HIGHLIGHT_MS, HINTS_PER_ROUND } from "@/lib/game";
+import { countValidLines, HINT_HIGHLIGHT_MS, HINTS_PER_ROUND } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
 import { Grid, type CellState } from "./Grid";
 import { PlayerList } from "./PlayerList";
-import { Button, Card, ErrorText, Toggle } from "./ui";
+import { Button, Card, ErrorText } from "./ui";
 
 interface Props {
   state: RoomState;
@@ -16,16 +16,59 @@ interface Props {
 }
 
 const LINE_SOUND = "/sounds/line.mp3";
+const FADE_IN_S = 1;
+const FADE_OUT_S = 1.5;
 
-/** Plays the line fragment. Must be called from a user gesture (tap) to satisfy autoplay rules. */
+/**
+ * Plays the line fragment with a fade in / fade out. Uses Web Audio (a GainNode) because
+ * iOS Safari ignores HTMLAudioElement.volume. Must be called from a tap so the AudioContext
+ * is allowed to start.
+ */
 function useLineSound(enabled: boolean) {
-  const audio = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => () => audio.current?.pause(), []);
+  const ctx = useRef<AudioContext | null>(null);
+  const buffer = useRef<Promise<AudioBuffer> | null>(null);
+  const current = useRef<AudioBufferSourceNode | null>(null);
+
+  useEffect(
+    () => () => {
+      current.current?.stop();
+      void ctx.current?.close();
+    },
+    [],
+  );
+
   return useCallback(() => {
     if (!enabled) return;
-    audio.current ??= new Audio(LINE_SOUND);
-    audio.current.currentTime = 0;
-    void audio.current.play().catch(() => {});
+    try {
+      ctx.current ??= new AudioContext();
+      const ac = ctx.current;
+      void ac.resume(); // inside the tap: unlocks audio on iOS
+      buffer.current ??= fetch(LINE_SOUND)
+        .then((r) => r.arrayBuffer())
+        .then((data) => ac.decodeAudioData(data));
+      void buffer.current
+        .then((buf) => {
+          current.current?.stop();
+          const src = ac.createBufferSource();
+          const gain = ac.createGain();
+          src.buffer = buf;
+          src.connect(gain).connect(ac.destination);
+          const t = ac.currentTime;
+          const end = t + buf.duration;
+          const fadeOutAt = Math.max(t + FADE_IN_S, end - FADE_OUT_S);
+          gain.gain.setValueAtTime(0, t);
+          gain.gain.linearRampToValueAtTime(1, t + Math.min(FADE_IN_S, buf.duration / 2));
+          gain.gain.setValueAtTime(1, fadeOutAt);
+          gain.gain.linearRampToValueAtTime(0, end);
+          src.start(t);
+          current.current = src;
+        })
+        .catch(() => {
+          buffer.current = null; // retry next time (e.g. network hiccup)
+        });
+    } catch {
+      // Web Audio unavailable: silently skip the cue
+    }
   }, [enabled]);
 }
 
@@ -37,8 +80,8 @@ export function Game({ state, token, refresh }: Props) {
   const myTurn = playing && room.currentTurnPlayerId === me.id;
   const total = room.size * room.size;
 
-  const [confirmCall, setConfirmCall] = useBoolPref(PREF_CONFIRM_CALL, false);
-  const [soundOn, setSoundOn] = useBoolPref(PREF_SOUND, true);
+  const [confirmCall] = useBoolPref(PREF_CONFIRM_CALL, false);
+  const [soundOn] = useBoolPref(PREF_SOUND, true);
   const playLine = useLineSound(soundOn);
 
   const [selected, setSelected] = useState<number | null>(null);
@@ -49,6 +92,8 @@ export function Game({ state, token, refresh }: Props) {
   const [notice, setNotice] = useState("");
   const [result, setResult] = useState<{ won: boolean; message: string } | null>(null);
   const [hintOn, setHintOn] = useState(false);
+  // Winner pop-up: shown once per finished round, until dismissed.
+  const [dismissedRound, setDismissedRound] = useState<number | null>(null);
   const hintTimer = useRef<number | null>(null);
   useEffect(() => () => void (hintTimer.current && window.clearTimeout(hintTimer.current)), []);
 
@@ -70,11 +115,16 @@ export function Game({ state, token, refresh }: Props) {
   const turnName = room.currentTurnPlayerId ? nick.get(room.currentTurnPlayerId) : null;
   const winnerName = room.winnerPlayerId ? nick.get(room.winnerPlayerId) : null;
 
-  /** Plays the fragment when adding `n` to the marks completes a new line. Call inside the tap handler. */
-  function cueIfNewLine(n: number) {
+  /**
+   * Plays the fragment when marking `n` completes a new *valid* line (every cell marked and really
+   * called). `justCalled` = n is being called right now by me. Call inside the tap handler.
+   */
+  function cueIfNewLine(n: number, justCalled = false) {
     if (!board || marked.has(n)) return;
-    const after = new Set(marked).add(n);
-    if (countMarkedLines(board, room.size, after) > countMarkedLines(board, room.size, marked)) playLine();
+    const calledNow = justCalled ? new Set(calledSet).add(n) : calledSet;
+    const before = countValidLines(board, room.size, marked, calledSet);
+    const after = countValidLines(board, room.size, new Set(marked).add(n), calledNow);
+    if (after > before) playLine();
   }
 
   async function toggleMark(n: number) {
@@ -109,7 +159,7 @@ export function Game({ state, token, refresh }: Props) {
   }
 
   function callNumber(n: number) {
-    cueIfNewLine(n); // the caller's number is marked for them by the server
+    cueIfNewLine(n, true); // the caller's number is marked for them by the server
     setPending((p) => new Map(p).set(n, true));
     void act(async () => {
       try {
@@ -171,6 +221,12 @@ export function Game({ state, token, refresh }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {room.status === "finished" && dismissedRound !== room.round && (
+        <WinnerOverlay
+          name={room.winnerPlayerId === me.id ? null : (winnerName ?? "Cineva")}
+          onClose={() => setDismissedRound(room.round)}
+        />
+      )}
       {room.status === "finished" ? (
         <Card className="border-amber-300 bg-amber-50 text-center dark:border-amber-700 dark:bg-amber-950">
           <p className="text-2xl font-black">
@@ -234,14 +290,14 @@ export function Game({ state, token, refresh }: Props) {
             <div className="flex gap-2">
               <Button
                 variant="secondary"
-                className={`shrink-0 ${hintOn ? "ring-2 ring-yellow-400" : ""}`}
+                className={`flex-1 basis-0 ${hintOn ? "ring-2 ring-yellow-400" : ""}`}
                 onClick={() => setHint(!hintOn)}
                 disabled={busy || (!hintOn && state.hintsLeft === 0)}
                 title={`Încercuiește cu galben, ${HINT_HIGHLIGHT_MS / 1000} secunde, numerele strigate pe care nu le-ai bifat.`}
               >
                 Show {state.hintsLeft}/{HINTS_PER_ROUND}
               </Button>
-              <Button variant="secondary" className="flex-1" onClick={() => void validate()} disabled={busy}>
+              <Button variant="secondary" className="flex-1 basis-0" onClick={() => void validate()} disabled={busy}>
                 Validează ({room.linesToWin} {room.linesToWin === 1 ? "linie" : "linii"})
               </Button>
             </div>
@@ -317,17 +373,6 @@ export function Game({ state, token, refresh }: Props) {
           </Button>
         )}
       </Card>
-
-      <Card>
-        <h2 className="mb-1 font-bold">Setări</h2>
-        <Toggle
-          label="Confirmare la strigare"
-          hint={confirmCall ? "Alegi numărul, apoi apeși „Strigă”." : "Numărul apăsat pe tura ta se strigă imediat."}
-          checked={confirmCall}
-          onChange={setConfirmCall}
-        />
-        <Toggle label="Sunet la linie completă" checked={soundOn} onChange={setSoundOn} />
-      </Card>
     </div>
   );
 }
@@ -388,5 +433,43 @@ function RevealedBoards({ state }: { state: RoomState }) {
         })}
       </div>
     </Card>
+  );
+}
+
+/** Full-screen "BINGO" pop-up when the game ends. `name` null = I won. */
+function WinnerOverlay({ name, onClose }: { name: string | null; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Câștigător"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-3xl bg-gradient-to-b from-amber-300 to-amber-500 p-8 text-center text-zinc-900 shadow-2xl"
+      >
+        <div className="animate-bounce text-7xl" aria-hidden>
+          🏆
+        </div>
+        <p className="mt-2 text-5xl font-black tracking-tight">BINGO!</p>
+        <p className="mt-3 text-2xl font-bold">{name === null ? "Ai câștigat!" : `${name} a câștigat!`}</p>
+        <button
+          type="button"
+          onClick={onClose}
+          autoFocus
+          className="mt-6 min-h-11 w-full rounded-xl bg-zinc-900 px-4 font-semibold text-white"
+        >
+          Vezi cardurile
+        </button>
+      </div>
+    </div>
   );
 }
