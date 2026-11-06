@@ -1,5 +1,5 @@
 import { notifyRoom } from "@/lib/server/broadcast";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
 import { requireHost, requireMember, requireStatus } from "@/lib/server/room";
 
@@ -13,7 +13,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/sk
 
     // Optimistic: only applies if nobody else changed the offset meanwhile.
     const { data, error } = await db()
-      .from("rooms")
+      .from(T.rooms)
       .update({ turn_offset: room.turn_offset + 1, updated_at: new Date().toISOString() })
       .eq("id", room.id)
       .eq("status", "playing")

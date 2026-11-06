@@ -1,6 +1,6 @@
 import { MIN_PLAYERS_TO_START, roundTurnOrder } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
 import { listPlayers, requireHost, requireMember, requireStatus } from "@/lib/server/room";
 
@@ -19,7 +19,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/st
 
     // Conditional update: only one start can win, and only from the lobby.
     const { data, error } = await db()
-      .from("rooms")
+      .from(T.rooms)
       .update({
         status: "playing",
         // Round 1: host first, then join order. Each later round the first caller rotates by one.

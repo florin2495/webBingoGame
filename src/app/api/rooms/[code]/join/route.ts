@@ -1,7 +1,7 @@
 import { NICKNAME_MAX } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
 import { hashToken, newPlayerToken, verifyPassword } from "@/lib/server/crypto";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { cleanText, fail, handle, isUniqueViolation, readJson } from "@/lib/server/http";
 import { getRoomByCode, touchRoom } from "@/lib/server/room";
 
@@ -22,7 +22,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/jo
     if (room.status !== "lobby") fail(409, "Jocul a început deja. Intră după runda curentă.");
 
     const { count, error: countError } = await db()
-      .from("players")
+      .from(T.players)
       .select("id", { count: "exact", head: true })
       .eq("room_id", room.id);
     if (countError) throw countError;
@@ -30,7 +30,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/jo
 
     const token = newPlayerToken();
     const { data, error } = await db()
-      .from("players")
+      .from(T.players)
       .insert({ room_id: room.id, nickname, token_hash: hashToken(token) })
       .select("id")
       .single();

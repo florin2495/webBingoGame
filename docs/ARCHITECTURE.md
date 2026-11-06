@@ -28,15 +28,19 @@ supabase.channel("room:<id>") ◀───────────────�
    random. Clientul îl ține în `localStorage`, iar DB-ul păstrează doar SHA-256. Fiecare request trimite
    `x-player-token`, iar serverul verifică `token → player` și `player.room_id == camera din URL`.
 4. **Parola camerei** e stocată ca hash `scrypt` cu salt. Verificarea folosește `timingSafeEqual`.
-5. **Race conditions fără lock-uri:** `called_numbers` are `unique(room, round, number)` și
+5. **Race conditions fără lock-uri:** `classicbingo_called_numbers` are `unique(room, round, number)` și
    `unique(room, round, seq)`. Tura e dedusă din `seq`, deci două strigări concurente pentru același
    slot nu pot trece amândouă. Câștigul e un `UPDATE ... WHERE status = 'playing'` condiționat, deci
    un singur câștigător.
 6. **Tura curentă** = `turn_order[(numere_strigate + turn_offset) mod jucători]`. `turn_order` se
    fixează la start, în ordinea intrării în cameră. Host-ul poate sări tura unui jucător absent
    (`turn_offset++`).
-7. **Runde:** `boards`, `called_numbers` și `marks` au coloana `round`. Runda nouă face `round++`,
+7. **Runde:** `classicbingo_boards`, `classicbingo_called_numbers` și `classicbingo_marks` au coloana `round`. Runda nouă face `round++`,
    `status = lobby` și resetează `ready`. Rundele vechi rămân în DB.
+
+8. **Prefix `classicbingo_`:** proiectul Supabase e comun pentru toate mini-jocurile din hub, deci
+   tabelele, constrângerile și indexurile acestui joc încep cu `classicbingo_` (migrația 004).
+   Numele tabelelor sunt într-un singur loc în cod: `T` din `src/lib/server/db.ts`.
 
 ## Fluxul stărilor
 

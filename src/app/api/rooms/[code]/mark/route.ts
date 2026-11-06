@@ -1,4 +1,4 @@
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle, readJson } from "@/lib/server/http";
 import { getBoard, requireMember, requireStatus } from "@/lib/server/room";
 
@@ -19,7 +19,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ma
     const board = await getBoard(player.id, room.round);
     if (!board) fail(409, "Nu ai o matrice în runda asta.");
 
-    const marks = db().from("marks");
+    const marks = db().from(T.marks);
     const { error } = body.marked
       ? await marks.upsert(
           { player_id: player.id, room_id: room.id, round: room.round, number },

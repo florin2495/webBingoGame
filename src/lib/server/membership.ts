@@ -1,7 +1,7 @@
 import "server-only";
 import { turnAfterLeave } from "@/lib/game";
 import { notifyRoom } from "./broadcast";
-import { db, type RoomRow } from "./db";
+import { db, type RoomRow, T } from "./db";
 import { listCalled, listPlayers } from "./room";
 
 /**
@@ -16,7 +16,7 @@ export async function removePlayer(room: RoomRow, playerId: string, reason: stri
   const remaining = (await listPlayers(room.id)).filter((p) => p.id !== playerId);
 
   if (remaining.length === 0) {
-    const { error } = await db().from("rooms").delete().eq("id", room.id);
+    const { error } = await db().from(T.rooms).delete().eq("id", room.id);
     if (error) throw error;
     return { roomClosed: true };
   }
@@ -36,16 +36,16 @@ export async function removePlayer(room: RoomRow, playerId: string, reason: stri
   }
 
   // Update the room first so the host / turn never points at a deleted player.
-  const { error: roomError } = await db().from("rooms").update(update).eq("id", room.id);
+  const { error: roomError } = await db().from(T.rooms).update(update).eq("id", room.id);
   if (roomError) throw roomError;
 
   if (newHostId && newHostId !== room.host_player_id) {
-    const { error } = await db().from("players").update({ is_host: true }).eq("id", newHostId);
+    const { error } = await db().from(T.players).update({ is_host: true }).eq("id", newHostId);
     if (error) throw error;
   }
 
   // Cascades to the player's boards and marks; their called numbers stay (player_id -> null).
-  const { error: deleteError } = await db().from("players").delete().eq("id", playerId);
+  const { error: deleteError } = await db().from(T.players).delete().eq("id", playerId);
   if (deleteError) throw deleteError;
 
   await notifyRoom(room.id, reason);

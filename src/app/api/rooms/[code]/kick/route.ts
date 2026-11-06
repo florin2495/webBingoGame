@@ -1,4 +1,4 @@
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle, readJson } from "@/lib/server/http";
 import { removePlayer } from "@/lib/server/membership";
 import { requireHost, requireMember } from "@/lib/server/room";
@@ -17,7 +17,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ki
     if (targetId === player.id) fail(400, "Nu te poți scoate singur. Folosește „Părăsește camera”.");
 
     const { data: target, error } = await db()
-      .from("players")
+      .from(T.players)
       .select("id")
       .eq("id", targetId)
       .eq("room_id", room.id)

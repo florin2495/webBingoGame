@@ -2,7 +2,7 @@ import "server-only";
 import { currentTurnIndex, HINTS_PER_ROUND, isRoomExpired, minutesLabel, ROOM_IDLE_MINUTES } from "@/lib/game";
 import type { CalledNumber, PublicPlayer, RevealedBoard, RoomState } from "@/lib/types";
 import { hashToken } from "./crypto";
-import { db, PLAYER_COLUMNS, type PlayerRow, type RoomRow } from "./db";
+import { db, PLAYER_COLUMNS, type PlayerRow, type RoomRow, T } from "./db";
 import { fail } from "./http";
 
 const ROOM_COLUMNS =
@@ -17,13 +17,13 @@ export function normalizeCode(code: string): string {
 }
 
 export async function getRoomByCode(code: string): Promise<RoomRow> {
-  const { data, error } = await db().from("rooms").select(ROOM_COLUMNS).eq("code", normalizeCode(code)).maybeSingle();
+  const { data, error } = await db().from(T.rooms).select(ROOM_COLUMNS).eq("code", normalizeCode(code)).maybeSingle();
   if (error) throw error;
   if (!data) fail(404, GONE);
   const room = data as RoomRow;
   // Lazy expiry: Vercel Hobby has no frequent cron, so idle rooms are closed when touched.
   if (isRoomExpired(room.status, room.last_activity_at)) {
-    await db().from("rooms").delete().eq("id", room.id).eq("last_activity_at", room.last_activity_at);
+    await db().from(T.rooms).delete().eq("id", room.id).eq("last_activity_at", room.last_activity_at);
     fail(404, GONE);
   }
   return room;
@@ -32,13 +32,13 @@ export async function getRoomByCode(code: string): Promise<RoomRow> {
 /** Deletes every lobby/finished room idle for longer than ROOM_IDLE_MINUTES. */
 export async function cleanupExpiredRooms(): Promise<void> {
   const cutoff = new Date(Date.now() - ROOM_IDLE_MINUTES * 60_000).toISOString();
-  const { error } = await db().from("rooms").delete().in("status", ["lobby", "finished"]).lt("last_activity_at", cutoff);
+  const { error } = await db().from(T.rooms).delete().in("status", ["lobby", "finished"]).lt("last_activity_at", cutoff);
   if (error) console.error("cleanup failed", error);
 }
 
 /** Records activity on a room, restarting its idle timer. */
 export async function touchRoom(roomId: string): Promise<void> {
-  const { error } = await db().from("rooms").update({ last_activity_at: new Date().toISOString() }).eq("id", roomId);
+  const { error } = await db().from(T.rooms).update({ last_activity_at: new Date().toISOString() }).eq("id", roomId);
   if (error) throw error;
 }
 
@@ -51,7 +51,7 @@ export async function requireMember(req: Request, code: string): Promise<{ room:
   if (!token || token.length > 200) fail(401, "Nu ești în această cameră.");
   const room = await getRoomByCode(code);
   const { data, error } = await db()
-    .from("players")
+    .from(T.players)
     .select(PLAYER_COLUMNS)
     .eq("token_hash", hashToken(token))
     .eq("room_id", room.id)
@@ -78,7 +78,7 @@ export function requireStatus(room: RoomRow, ...allowed: RoomRow["status"][]) {
 
 export async function listPlayers(roomId: string): Promise<PlayerRow[]> {
   const { data, error } = await db()
-    .from("players")
+    .from(T.players)
     .select(PLAYER_COLUMNS)
     .eq("room_id", roomId)
     .order("joined_at", { ascending: true });
@@ -88,7 +88,7 @@ export async function listPlayers(roomId: string): Promise<PlayerRow[]> {
 
 export async function listCalled(roomId: string, round: number): Promise<CalledNumber[]> {
   const { data, error } = await db()
-    .from("called_numbers")
+    .from(T.calledNumbers)
     .select("seq, number, player_id")
     .eq("room_id", roomId)
     .eq("round", round)
@@ -99,7 +99,7 @@ export async function listCalled(roomId: string, round: number): Promise<CalledN
 
 export async function getBoard(playerId: string, round: number): Promise<number[] | null> {
   const { data, error } = await db()
-    .from("boards")
+    .from(T.boards)
     .select("cells")
     .eq("player_id", playerId)
     .eq("round", round)
@@ -109,7 +109,7 @@ export async function getBoard(playerId: string, round: number): Promise<number[
 }
 
 export async function getMarks(playerId: string, round: number): Promise<number[]> {
-  const { data, error } = await db().from("marks").select("number").eq("player_id", playerId).eq("round", round);
+  const { data, error } = await db().from(T.marks).select("number").eq("player_id", playerId).eq("round", round);
   if (error) throw error;
   return (data ?? []).map((r) => r.number as number);
 }
@@ -129,8 +129,8 @@ const toPublic = (p: PlayerRow): PublicPlayer => ({
 /** All boards and marks of a round. Only ever sent to clients once the game is finished. */
 async function revealRound(roomId: string, round: number): Promise<RevealedBoard[]> {
   const [boards, marks] = await Promise.all([
-    db().from("boards").select("player_id, cells").eq("room_id", roomId).eq("round", round),
-    db().from("marks").select("player_id, number").eq("room_id", roomId).eq("round", round),
+    db().from(T.boards).select("player_id, cells").eq("room_id", roomId).eq("round", round),
+    db().from(T.marks).select("player_id, number").eq("room_id", roomId).eq("round", round),
   ]);
   if (boards.error) throw boards.error;
   if (marks.error) throw marks.error;

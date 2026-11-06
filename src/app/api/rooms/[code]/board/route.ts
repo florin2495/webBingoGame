@@ -1,5 +1,5 @@
 import { generateBoard, isValidBoard } from "@/lib/game";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle, readJson } from "@/lib/server/http";
 import { requireMember, requireStatus, touchRoom } from "@/lib/server/room";
 
@@ -23,7 +23,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/bo
     }
 
     const { error } = await db()
-      .from("boards")
+      .from(T.boards)
       .upsert(
         { player_id: player.id, room_id: room.id, round: room.round, cells, updated_at: new Date().toISOString() },
         { onConflict: "player_id,round" },

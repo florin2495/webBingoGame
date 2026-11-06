@@ -1,5 +1,5 @@
 import { HINTS_PER_ROUND } from "@/lib/game";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
 import { getBoard, requireMember, requireStatus } from "@/lib/server/room";
 
@@ -18,7 +18,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/hi
 
     // Optimistic increment: a double tap cannot spend two hints for one read.
     const { data, error } = await db()
-      .from("players")
+      .from(T.players)
       .update({ hints_used: used + 1 })
       .eq("id", player.id)
       .eq("hints_used", used)

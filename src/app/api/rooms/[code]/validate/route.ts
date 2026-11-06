@@ -1,6 +1,6 @@
 import { countValidLines } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
 import { getBoard, getMarks, listCalled, requireMember, requireStatus } from "@/lib/server/room";
 
@@ -34,7 +34,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/va
 
     // Conditional update: the first valid claim wins, later ones see status != playing.
     const { data, error } = await db()
-      .from("rooms")
+      .from(T.rooms)
       .update({
         status: "finished",
         winner_player_id: player.id,

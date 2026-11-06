@@ -1,6 +1,18 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+/**
+ * Table names. The Supabase project is shared by several mini-games (the hub),
+ * so every ClassicBingo table carries the classicbingo_ prefix (migration 004).
+ */
+export const T = {
+  rooms: "classicbingo_rooms",
+  players: "classicbingo_players",
+  boards: "classicbingo_boards",
+  calledNumbers: "classicbingo_called_numbers",
+  marks: "classicbingo_marks",
+} as const;
+
 let admin: SupabaseClient | null = null;
 
 /** Service-role client. Bypasses RLS - must never be imported from client code. */

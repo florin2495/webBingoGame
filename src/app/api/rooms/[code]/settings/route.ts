@@ -1,6 +1,6 @@
 import { isValidLinesToWin, isValidSize } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle, readJson } from "@/lib/server/http";
 import { requireHost, requireMember, requireStatus } from "@/lib/server/room";
 
@@ -23,7 +23,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/se
 
     // Only applies if the room is still in the lobby with the settings we read.
     const { data, error } = await db()
-      .from("rooms")
+      .from(T.rooms)
       .update({
         size,
         lines_to_win: linesToWin,
@@ -39,10 +39,10 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/se
     if (!data || data.length === 0) fail(409, "Setările s-au schimbat între timp sau jocul a pornit. Reîncarcă.");
 
     if (size !== room.size) {
-      const { error: boardsError } = await db().from("boards").delete().eq("room_id", room.id).eq("round", room.round);
+      const { error: boardsError } = await db().from(T.boards).delete().eq("room_id", room.id).eq("round", room.round);
       if (boardsError) throw boardsError;
     }
-    const { error: readyError } = await db().from("players").update({ ready: false }).eq("room_id", room.id);
+    const { error: readyError } = await db().from(T.players).update({ ready: false }).eq("room_id", room.id);
     if (readyError) throw readyError;
 
     await notifyRoom(room.id, "settings_changed");

@@ -20,8 +20,11 @@ so this list is the source of truth. **Update it whenever the user confirms a mi
 | `supabase/schema.sql` (initial) | yes | |
 | `supabase/migrations/002_activity_hints.sql` | yes (2026-11-06) | `rooms.last_activity_at`, `players.hints_used` |
 | `supabase/migrations/003_five_hints.sql` | yes (2026-11-06, verified) | `hints_used` check 0..5 |
+| `supabase/migrations/004_classicbingo_prefix.sql` | **NOT YET** | renames all tables/constraints/indexes to `classicbingo_*`; breaks code < 1.2.3, deploy 1.2.3 right after |
 
 Rules for schema changes:
+- The Supabase project is shared by all hub mini-games: every object of this game is prefixed `classicbingo_`
+  (tables, constraints, indexes). Table names live in `T` in `src/lib/server/db.ts`.
 - New migration = new numbered file in `supabase/migrations/`, additive / backward compatible when possible,
   and the same change folded into `supabase/schema.sql` (used for fresh projects).
 - Code that needs a migration must not be pushed until the user has run it. Verify it by effect with the

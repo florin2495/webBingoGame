@@ -1,5 +1,5 @@
 import { notifyRoom } from "@/lib/server/broadcast";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle, isUniqueViolation, readJson } from "@/lib/server/http";
 import { listCalled, requireMember, requireStatus, turnPlayerId } from "@/lib/server/room";
 
@@ -21,7 +21,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ca
 
     // seq = turn slot. unique(room, round, seq) rejects a concurrent call for the same turn,
     // unique(room, round, number) rejects a number called twice.
-    const { error } = await db().from("called_numbers").insert({
+    const { error } = await db().from(T.calledNumbers).insert({
       room_id: room.id,
       round: room.round,
       seq: called.length + 1,
@@ -33,7 +33,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ca
 
     // The caller's own number is marked for them immediately (rule 7).
     const { error: markError } = await db()
-      .from("marks")
+      .from(T.marks)
       .upsert(
         { player_id: player.id, room_id: room.id, round: room.round, number },
         { onConflict: "player_id,round,number", ignoreDuplicates: true },

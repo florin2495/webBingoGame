@@ -1,6 +1,6 @@
 import { isValidBoard } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
-import { db } from "@/lib/server/db";
+import { db, T } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
 import { getBoard, requireMember, requireStatus, touchRoom } from "@/lib/server/room";
 
@@ -15,7 +15,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/re
     const board = await getBoard(player.id, room.round);
     if (!board || !isValidBoard(board, room.size)) fail(409, "Completează sau generează matricea mai întâi.");
 
-    const { error } = await db().from("players").update({ ready: true }).eq("id", player.id);
+    const { error } = await db().from(T.players).update({ ready: true }).eq("id", player.id);
     if (error) throw error;
 
     await touchRoom(room.id);
