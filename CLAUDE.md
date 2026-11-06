@@ -6,6 +6,7 @@
 - GitHub: personal account **florin2495** only (repo `florin2495/webBingoGame`, private). Never the work account.
   Local git identity is pinned in `.git/config`.
 - Every push to `main` deploys to production on Vercel: https://web-bingo-game.vercel.app
+- Feedback (`POST /api/feedback`) writes to `hub_feedback` (owned by florin2495/hailataticu-hub, slug `bingo`); this game must not be deployed before that table exists.
 - Ask the user before pushing (= deploying), unless they explicitly say to deploy.
 - **Before every push, bump the patch version** in `package.json` (and `npm install --package-lock-only`).
   It is shown in-game next to "Setări". Current: see `package.json`.

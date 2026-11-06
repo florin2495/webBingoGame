@@ -16,6 +16,7 @@ import { PREF_NICKNAME, useStringPref, writePref } from "@/lib/client/prefs";
 import { realtimeClient } from "@/lib/client/realtime";
 import { minutesLabel, NICKNAME_MAX, ROOM_IDLE_MINUTES } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
+import { FeedbackButton } from "./FeedbackButton";
 import { Game } from "./Game";
 import { Lobby } from "./Lobby";
 import { SettingsPanel } from "./SettingsPanel";
@@ -217,7 +218,10 @@ function RoomHeader({ state }: { state: RoomState }) {
         <Link href="/" className="text-xs font-semibold text-zinc-500">
           ← Bingo
         </Link>
-        <h1 className="truncate text-xl font-black">{room.name}</h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="truncate text-xl font-black">{room.name}</h1>
+          <FeedbackButton compact />
+        </div>
         <p className="text-xs text-zinc-500">
           {room.size}×{room.size} · {room.linesToWin} {room.linesToWin === 1 ? "linie" : "linii"} pentru câștig · runda{" "}
           {room.round} · {statusLabel}
