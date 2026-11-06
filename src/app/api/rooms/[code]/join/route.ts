@@ -1,3 +1,4 @@
+import { NICKNAME_MAX } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
 import { hashToken, newPlayerToken, verifyPassword } from "@/lib/server/crypto";
 import { db } from "@/lib/server/db";
@@ -11,7 +12,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/jo
   return handle(async () => {
     const { code } = await ctx.params;
     const body = await readJson(req);
-    const nickname = cleanText(body.nickname, "Nickname-ul", 1, 20);
+    const nickname = cleanText(body.nickname, "Nickname-ul", 1, NICKNAME_MAX);
     const room = await getRoomByCode(code);
 
     if (room.password_hash) {

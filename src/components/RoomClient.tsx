@@ -14,7 +14,7 @@ import {
 } from "@/lib/client/api";
 import { PREF_NICKNAME, useStringPref, writePref } from "@/lib/client/prefs";
 import { realtimeClient } from "@/lib/client/realtime";
-import { minutesLabel, ROOM_IDLE_MINUTES } from "@/lib/game";
+import { minutesLabel, NICKNAME_MAX, ROOM_IDLE_MINUTES } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
 import { Game } from "./Game";
 import { Lobby } from "./Lobby";
@@ -273,7 +273,7 @@ function JoinForm({ code }: { code: string }) {
       )}
       <Card>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <Field label="Nickname-ul tău" value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={20} required />
+          <Field label="Nickname-ul tău" value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={NICKNAME_MAX} required />
           <Field
             label="Parolă (dacă are camera)"
             type="password"

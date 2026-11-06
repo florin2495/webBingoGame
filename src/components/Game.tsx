@@ -37,7 +37,7 @@ export function Game({ state, token, refresh }: Props) {
   const myTurn = playing && room.currentTurnPlayerId === me.id;
   const total = room.size * room.size;
 
-  const [confirmCall, setConfirmCall] = useBoolPref(PREF_CONFIRM_CALL, true);
+  const [confirmCall, setConfirmCall] = useBoolPref(PREF_CONFIRM_CALL, false);
   const [soundOn, setSoundOn] = useBoolPref(PREF_SOUND, true);
   const playLine = useLineSound(soundOn);
 
@@ -67,7 +67,6 @@ export function Game({ state, token, refresh }: Props) {
 
   // A selection is only meaningful while it is still my turn and the number is still free.
   const pick = myTurn && selected !== null && !calledSet.has(selected) ? selected : null;
-  const last = called.at(-1);
   const turnName = room.currentTurnPlayerId ? nick.get(room.currentTurnPlayerId) : null;
   const winnerName = room.winnerPlayerId ? nick.get(room.winnerPlayerId) : null;
 
@@ -196,35 +195,9 @@ export function Game({ state, token, refresh }: Props) {
             </p>
           )}
         </Card>
-      ) : (
-        <Card className={myTurn ? "border-indigo-400 ring-2 ring-indigo-400" : ""}>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase text-zinc-500">Tura</p>
-              <p className={`text-lg font-bold ${myTurn ? "text-indigo-600 dark:text-indigo-400" : ""}`}>
-                {myTurn ? "Tura ta!" : (turnName ?? "—")}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs font-semibold uppercase text-zinc-500">Ultimul strigat</p>
-              <p className="text-3xl font-black tabular-nums">{last ? last.number : "—"}</p>
-            </div>
-          </div>
-          {myTurn && (
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              {called.length >= total
-                ? "Toate numerele au fost strigate."
-                : !confirmCall
-                  ? "Apasă un număr nestrigat: se strigă imediat."
-                  : pick === null
-                    ? "Alege din matricea ta un număr nestrigat."
-                    : `Ai ales ${pick}. Confirmă mai jos.`}
-            </p>
-          )}
-        </Card>
-      )}
+      ) : null}
 
-      <Card>
+      <Card className={myTurn ? "border-indigo-400 ring-2 ring-indigo-400" : ""}>
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="font-bold">Matricea ta</h2>
           <span className="flex items-center gap-2 text-[10px] text-zinc-500">
@@ -232,6 +205,17 @@ export function Game({ state, token, refresh }: Props) {
             <span className="inline-block h-3 w-3 rounded-sm bg-emerald-700" /> de alții
           </span>
         </div>
+        {myTurn && (
+          <p className="mb-2 text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+            {called.length >= total
+              ? "Tura ta: toate numerele au fost strigate."
+              : !confirmCall
+                ? "Tura ta: apasă un număr nestrigat."
+                : pick === null
+                  ? "Tura ta: alege un număr nestrigat."
+                  : `Ai ales ${pick}. Confirmă mai jos.`}
+          </p>
+        )}
         {board ? (
           <Grid size={room.size} cells={board} stateOf={cellState} onCellClick={playing ? onCell : undefined} />
         ) : (
@@ -247,26 +231,21 @@ export function Game({ state, token, refresh }: Props) {
                 {pick === null ? "Alege un număr" : `Strigă ${pick}`}
               </Button>
             )}
-            <Button variant="secondary" onClick={() => void validate()} disabled={busy}>
-              Validează ({room.linesToWin} {room.linesToWin === 1 ? "linie" : "linii"})
-            </Button>
-
-            <div className="mt-1 flex flex-col border-t border-zinc-200 pt-2 dark:border-zinc-800">
-              <Toggle
-                label={`Arată numerele ratate (${state.hintsLeft}/${HINTS_PER_ROUND} rămase)`}
-                hint={`Încercuiește cu galben, ${HINT_HIGHLIGHT_MS / 1000} secunde, numerele strigate pe care nu le-ai bifat.`}
-                checked={hintOn}
-                onChange={setHint}
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className={`shrink-0 ${hintOn ? "ring-2 ring-yellow-400" : ""}`}
+                onClick={() => setHint(!hintOn)}
                 disabled={busy || (!hintOn && state.hintsLeft === 0)}
-              />
-              <Toggle
-                label="Confirmare la strigare"
-                hint={confirmCall ? "Alegi numărul, apoi apeși „Strigă”." : "Numărul apăsat se strigă imediat."}
-                checked={confirmCall}
-                onChange={setConfirmCall}
-              />
-              <Toggle label="Sunet la linie completă" checked={soundOn} onChange={setSoundOn} />
+                title={`Încercuiește cu galben, ${HINT_HIGHLIGHT_MS / 1000} secunde, numerele strigate pe care nu le-ai bifat.`}
+              >
+                Show {state.hintsLeft}/{HINTS_PER_ROUND}
+              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => void validate()} disabled={busy}>
+                Validează ({room.linesToWin} {room.linesToWin === 1 ? "linie" : "linii"})
+              </Button>
             </div>
+
           </div>
         )}
         <div className="mt-2 flex flex-col gap-1">
@@ -286,9 +265,19 @@ export function Game({ state, token, refresh }: Props) {
       {room.status === "finished" && state.reveal && <RevealedBoards state={state} />}
 
       <Card>
-        <h2 className="mb-2 font-bold">
-          Numere strigate <span className="font-normal text-zinc-500">({called.length})</span>
-        </h2>
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <h2 className="font-bold">
+            Numere strigate <span className="font-normal text-zinc-500">({called.length})</span>
+          </h2>
+          {playing && (
+            <span className="truncate text-sm">
+              Tura:{" "}
+              <strong className={myTurn ? "text-indigo-600 dark:text-indigo-400" : ""}>
+                {myTurn ? "tu" : (turnName ?? "—")}
+              </strong>
+            </span>
+          )}
+        </div>
         {called.length === 0 ? (
           <p className="text-sm text-zinc-500">Încă nimic.</p>
         ) : (
@@ -327,6 +316,17 @@ export function Game({ state, token, refresh }: Props) {
             Sari tura lui {turnName}
           </Button>
         )}
+      </Card>
+
+      <Card>
+        <h2 className="mb-1 font-bold">Setări</h2>
+        <Toggle
+          label="Confirmare la strigare"
+          hint={confirmCall ? "Alegi numărul, apoi apeși „Strigă”." : "Numărul apăsat pe tura ta se strigă imediat."}
+          checked={confirmCall}
+          onChange={setConfirmCall}
+        />
+        <Toggle label="Sunet la linie completă" checked={soundOn} onChange={setSoundOn} />
       </Card>
     </div>
   );

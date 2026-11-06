@@ -56,6 +56,7 @@ export function useStringPref(key: string): string | null {
   );
 }
 
-export const PREF_CONFIRM_CALL = "bingo:pref:confirmCall";
-export const PREF_SOUND = "bingo:pref:sound";
+// v2: default changed to "off" - a new key so every device picks up the new default once.
+export const PREF_CONFIRM_CALL = "bingo:pref:confirmCall:v2";
+export const PREF_SOUND = "bingo:pref:sound:v2";
 export const PREF_NICKNAME = "bingo:pref:nickname";

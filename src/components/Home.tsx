@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { api, saveSession } from "@/lib/client/api";
 import { PREF_NICKNAME, useStringPref, writePref } from "@/lib/client/prefs";
-import { LINES_MAX, LINES_MIN, SIZE_DEFAULT, SIZE_MAX, SIZE_MIN } from "@/lib/game";
+import { LINES_MAX, LINES_MIN, NICKNAME_MAX, SIZE_DEFAULT, SIZE_MAX, SIZE_MIN } from "@/lib/game";
 import type { RoomListItem } from "@/lib/types";
 import { RoomList } from "./RoomList";
 import { Button, Card, ErrorText, Field } from "./ui";
@@ -129,7 +129,7 @@ export function Home() {
             label="Nickname-ul tău"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            maxLength={20}
+            maxLength={NICKNAME_MAX}
             autoComplete="nickname"
             required
           />

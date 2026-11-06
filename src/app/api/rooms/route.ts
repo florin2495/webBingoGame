@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { isValidLinesToWin, isValidSize, SIZE_DEFAULT } from "@/lib/game";
+import { isValidLinesToWin, isValidSize, NICKNAME_MAX, SIZE_DEFAULT } from "@/lib/game";
 import { hashPassword, hashToken, newPlayerToken, newRoomCode } from "@/lib/server/crypto";
 import { db } from "@/lib/server/db";
 import { cleanText, fail, handle, isUniqueViolation, readJson } from "@/lib/server/http";
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     await cleanupExpiredRooms();
     const body = await readJson(req);
     const name = cleanText(body.name, "Numele camerei", 1, 40);
-    const nickname = cleanText(body.nickname, "Nickname-ul", 1, 20);
+    const nickname = cleanText(body.nickname, "Nickname-ul", 1, NICKNAME_MAX);
     const size = body.size === undefined ? SIZE_DEFAULT : Number(body.size);
     const linesToWin = body.linesToWin === undefined ? 1 : Number(body.linesToWin);
     if (!isValidSize(size)) fail(400, "Dimensiunea matricei trebuie să fie între 3 și 10.");

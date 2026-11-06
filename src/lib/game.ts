@@ -6,6 +6,7 @@ export const SIZE_DEFAULT = 7;
 export const LINES_MIN = 1;
 export const LINES_MAX = 3;
 export const MIN_PLAYERS_TO_START = 2;
+export const NICKNAME_MAX = 10;
 /**
  * Lobby/finished rooms are closed (deleted) after this long without activity. Activity includes
  * presence: every open room page polls /state, which refreshes the timer (see PRESENCE_TOUCH_MS),
