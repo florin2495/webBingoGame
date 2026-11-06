@@ -316,7 +316,7 @@ export function Game({ state, token, refresh }: Props) {
 
       <Card>
         <h2 className="mb-2 font-bold">Ordinea turelor</h2>
-        <PlayerList state={state} mode="game" />
+        <PlayerList state={state} mode="game" token={token} refresh={refresh} />
         {isHost && playing && room.currentTurnPlayerId !== me.id && (
           <Button
             variant="secondary"

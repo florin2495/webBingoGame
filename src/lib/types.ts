@@ -54,7 +54,6 @@ export interface RoomListItem {
   linesToWin: number;
   hasPassword: boolean;
   players: number;
-  minutesLeft: number;
 }
 
 export interface Session {

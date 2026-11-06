@@ -6,6 +6,7 @@ import {
   LINES_MAX,
   LINES_MIN,
   MIN_PLAYERS_TO_START,
+  minutesLabel,
   ROOM_IDLE_MINUTES,
   roundTurnOrder,
   SIZE_MAX,
@@ -160,7 +161,7 @@ export function Lobby({ state, token, refresh }: Props) {
             {readyCount}/{players.length} ready
           </span>
         </div>
-        <PlayerList state={state} mode="lobby" />
+        <PlayerList state={state} mode="lobby" token={token} refresh={refresh} />
         {isHost ? (
           <>
             <Button className="mt-3 w-full" onClick={() => void start()} disabled={busy || !allReady}>
@@ -181,7 +182,7 @@ export function Lobby({ state, token, refresh }: Props) {
         )}
         <p className="mt-2 text-center text-xs text-zinc-500">
           Runda {room.round} o începe <strong>{nextStarter(state)}</strong>. Camera se închide automat după{" "}
-          {ROOM_IDLE_MINUTES} de minute fără activitate.
+          {minutesLabel(ROOM_IDLE_MINUTES)} în care nimeni nu o are deschisă.
         </p>
       </Card>
     </div>

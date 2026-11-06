@@ -3,6 +3,8 @@ import {
   allLines,
   countMarkedLines,
   isRoomExpired,
+  minutesLabel,
+  ROOM_IDLE_MINUTES,
   roundTurnOrder,
   turnAfterLeave,
   countValidLines,
@@ -102,10 +104,16 @@ describe("round turn order", () => {
 
 describe("room expiry", () => {
   const now = Date.parse("2026-11-06T12:00:00Z");
-  it("expires idle lobby and finished rooms after 60 minutes", () => {
-    expect(isRoomExpired("lobby", "2026-11-06T10:59:00Z", now)).toBe(true);
-    expect(isRoomExpired("finished", "2026-11-06T10:59:00Z", now)).toBe(true);
-    expect(isRoomExpired("lobby", "2026-11-06T11:01:00Z", now)).toBe(false);
+  const ago = (min: number) => new Date(now - min * 60_000).toISOString();
+  it(`expires idle lobby and finished rooms after ${ROOM_IDLE_MINUTES} minutes`, () => {
+    expect(isRoomExpired("lobby", ago(ROOM_IDLE_MINUTES + 0.5), now)).toBe(true);
+    expect(isRoomExpired("finished", ago(ROOM_IDLE_MINUTES + 0.5), now)).toBe(true);
+    expect(isRoomExpired("lobby", ago(ROOM_IDLE_MINUTES - 0.5), now)).toBe(false);
+  });
+  it("labels minutes in Romanian", () => {
+    expect(minutesLabel(2)).toBe("2 minute");
+    expect(minutesLabel(60)).toBe("60 de minute");
+    expect(minutesLabel(1)).toBe("1 minut");
   });
   it("never expires a game in progress", () => {
     expect(isRoomExpired("playing", "2026-11-05T00:00:00Z", now)).toBe(false);

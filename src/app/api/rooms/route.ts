@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { isValidLinesToWin, isValidSize, ROOM_IDLE_MINUTES, SIZE_DEFAULT } from "@/lib/game";
+import { isValidLinesToWin, isValidSize, SIZE_DEFAULT } from "@/lib/game";
 import { hashPassword, hashToken, newPlayerToken, newRoomCode } from "@/lib/server/crypto";
 import { db } from "@/lib/server/db";
 import { cleanText, fail, handle, isUniqueViolation, readJson } from "@/lib/server/http";
@@ -18,7 +18,6 @@ export async function GET() {
       .order("last_activity_at", { ascending: false })
       .limit(50);
     if (error) throw error;
-    const now = Date.now();
     const rooms: RoomListItem[] = (data ?? []).map((r) => ({
       code: r.code,
       name: r.name,
@@ -26,10 +25,6 @@ export async function GET() {
       linesToWin: r.lines_to_win,
       hasPassword: r.password_hash !== null,
       players: (r.players as unknown as { count: number }[])[0]?.count ?? 0,
-      minutesLeft: Math.max(
-        0,
-        Math.ceil(ROOM_IDLE_MINUTES - (now - new Date(r.last_activity_at).getTime()) / 60_000),
-      ),
     }));
     return { rooms };
   });

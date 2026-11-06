@@ -1,5 +1,5 @@
 import "server-only";
-import { currentTurnIndex, HINTS_PER_ROUND, isRoomExpired, ROOM_IDLE_MINUTES } from "@/lib/game";
+import { currentTurnIndex, HINTS_PER_ROUND, isRoomExpired, minutesLabel, ROOM_IDLE_MINUTES } from "@/lib/game";
 import type { CalledNumber, PublicPlayer, RevealedBoard, RoomState } from "@/lib/types";
 import { hashToken } from "./crypto";
 import { db, PLAYER_COLUMNS, type PlayerRow, type RoomRow } from "./db";
@@ -8,7 +8,7 @@ import { fail } from "./http";
 const ROOM_COLUMNS =
   "id, code, name, password_hash, size, lines_to_win, status, round, turn_order, turn_offset, host_player_id, winner_player_id, last_activity_at";
 
-const GONE = `Camera nu există sau a fost închisă după ${ROOM_IDLE_MINUTES} de minute de inactivitate.`;
+const GONE = `Camera nu există sau a fost închisă după ${minutesLabel(ROOM_IDLE_MINUTES)} de inactivitate.`;
 
 export function normalizeCode(code: string): string {
   const c = decodeURIComponent(code).trim().toUpperCase();

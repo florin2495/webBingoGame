@@ -73,7 +73,7 @@ export function RoomList({
                 </span>
                 <span className="block text-xs text-zinc-500">
                   {r.size}×{r.size} · {r.linesToWin} {r.linesToWin === 1 ? "linie" : "linii"} · {r.players}{" "}
-                  {r.players === 1 ? "jucător" : "jucători"} · se închide în {r.minutesLeft} min
+                  {r.players === 1 ? "jucător" : "jucători"}
                 </span>
               </span>
               <span className="shrink-0 text-right">

@@ -14,13 +14,14 @@ import {
 } from "@/lib/client/api";
 import { PREF_NICKNAME, useStringPref, writePref } from "@/lib/client/prefs";
 import { realtimeClient } from "@/lib/client/realtime";
-import { ROOM_IDLE_MINUTES } from "@/lib/game";
+import { minutesLabel, ROOM_IDLE_MINUTES } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
 import { Game } from "./Game";
 import { Lobby } from "./Lobby";
 import { Button, Card, ErrorText, Field } from "./ui";
 
 const POLL_MS = 15_000;
+const removedKey = (code: string) => `bingo:removed:${code}`;
 const SERVER_SNAPSHOT = "__server__";
 
 export function RoomClient({ code }: { code: string }) {
@@ -56,6 +57,7 @@ function useRoomState(code: string, token: string) {
     } catch (err) {
       if (id !== latest.current) return;
       if (err instanceof ApiRequestError && err.status === 401) {
+        writePref(removedKey(code), "1"); // kicked (or session gone): explain it on the join form
         clearSession(code); // token no longer valid for this room -> show join form
       } else if (err instanceof ApiRequestError && err.status === 404) {
         setMissing(true);
@@ -106,7 +108,7 @@ function Room({ code, token }: { code: string; token: string }) {
       <main className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-12 text-center">
         <p className="text-lg font-semibold">Camera {code} nu mai există.</p>
         <p className="text-sm text-zinc-500">
-          Camerele se închid automat după {ROOM_IDLE_MINUTES} de minute fără activitate.
+          Camerele se închid automat după {minutesLabel(ROOM_IDLE_MINUTES)} în care nimeni nu le are deschise.
         </p>
         <Link href="/" className="font-semibold text-indigo-600 underline">
           Înapoi la început
@@ -238,6 +240,7 @@ function JoinForm({ code }: { code: string }) {
   const [typed, setNickname] = useState<string | null>(null);
   const nickname = typed ?? stored ?? "";
   const [password, setPassword] = useState("");
+  const removed = useStringPref(removedKey(code)) === "1";
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -250,6 +253,7 @@ function JoinForm({ code }: { code: string }) {
       const res = await api<{ code: string; playerId: string; token: string }>(`/api/rooms/${code}/join`, {
         body: { nickname, password },
       });
+      writePref(removedKey(code), "0");
       saveSession(res.code, { playerId: res.playerId, token: res.token });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Eroare.");
@@ -262,6 +266,11 @@ function JoinForm({ code }: { code: string }) {
       <h1 className="text-center text-2xl font-black">
         Intră în camera <span className="font-mono tracking-widest">{code}</span>
       </h1>
+      {removed && (
+        <p role="status" className="rounded-lg bg-amber-100 px-3 py-2 text-center text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          Nu mai ești în cameră: ai fost scos de host sau sesiunea ta a expirat. Poți reintra cât camera e în lobby.
+        </p>
+      )}
       <Card>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <Field label="Nickname-ul tău" value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={20} required />

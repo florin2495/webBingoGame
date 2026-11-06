@@ -6,8 +6,19 @@ export const SIZE_DEFAULT = 7;
 export const LINES_MIN = 1;
 export const LINES_MAX = 3;
 export const MIN_PLAYERS_TO_START = 2;
-/** Lobby/finished rooms with no activity for this long are closed (deleted). */
-export const ROOM_IDLE_MINUTES = 60;
+/**
+ * Lobby/finished rooms are closed (deleted) after this long without activity. Activity includes
+ * presence: every open room page polls /state, which refreshes the timer (see PRESENCE_TOUCH_MS),
+ * so a room only closes once nobody has it open.
+ */
+export const ROOM_IDLE_MINUTES = 2;
+/** /state refreshes last_activity_at at most this often, to keep DB writes low. */
+export const PRESENCE_TOUCH_MS = 20_000;
+
+/** "2 minute" / "60 de minute" (Romanian numeral agreement). */
+export function minutesLabel(n: number): string {
+  return `${n} ${n >= 20 ? "de " : ""}${n === 1 ? "minut" : "minute"}`;
+}
 export const HINTS_PER_ROUND = 3;
 export const HINT_HIGHLIGHT_MS = 5000;
 
