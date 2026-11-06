@@ -20,7 +20,7 @@ so this list is the source of truth. **Update it whenever the user confirms a mi
 | `supabase/schema.sql` (initial) | yes | |
 | `supabase/migrations/002_activity_hints.sql` | yes (2026-11-06) | `rooms.last_activity_at`, `players.hints_used` |
 | `supabase/migrations/003_five_hints.sql` | yes (2026-11-06, verified) | `hints_used` check 0..5 |
-| `supabase/migrations/004_classicbingo_prefix.sql` | **NOT YET** | renames all tables/constraints/indexes to `classicbingo_*`; breaks code < 1.2.3, deploy 1.2.3 right after |
+| `supabase/migrations/004_classicbingo_prefix.sql` | yes (2026-11-06, verified) | renames all tables/constraints/indexes to `classicbingo_*`; breaks code < 1.2.3, deploy 1.2.3 right after |
 
 Rules for schema changes:
 - The Supabase project is shared by all hub mini-games: every object of this game is prefixed `classicbingo_`
