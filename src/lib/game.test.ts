@@ -4,6 +4,7 @@ import {
   countMarkedLines,
   isRoomExpired,
   roundTurnOrder,
+  turnAfterLeave,
   countValidLines,
   currentTurnIndex,
   generateBoard,
@@ -115,5 +116,40 @@ describe("marked lines (sound cue)", () => {
   it("counts lines regardless of called numbers", () => {
     expect(countMarkedLines([1, 2, 3, 4, 5, 6, 7, 8, 9], 3, new Set([1, 2, 3]))).toBe(1);
     expect(countMarkedLines([1, 2, 3, 4, 5, 6, 7, 8, 9], 3, new Set([1, 2]))).toBe(0);
+  });
+});
+
+describe("leaving a running game", () => {
+  const order = ["a", "b", "c", "d"];
+  const turnOf = (r: { order: string[]; offset: number }, called: number) =>
+    r.order[currentTurnIndex(called, r.offset, r.order.length)];
+
+  it("keeps the turn with the current player when someone else leaves", () => {
+    // 5 called, offset 0 -> index 1 -> "b" has the turn
+    const r = turnAfterLeave(order, 0, 5, "d");
+    expect(r.currentId).toBe("b");
+    expect(turnOf(r, 5)).toBe("b");
+    expect(turnOf(r, 6)).toBe("c"); // then continues in order
+    expect(turnOf(r, 7)).toBe("a");
+  });
+
+  it("passes the turn to the next player when the current one leaves", () => {
+    const r = turnAfterLeave(order, 0, 5, "b");
+    expect(r.order).toEqual(["a", "c", "d"]);
+    expect(turnOf(r, 5)).toBe("c");
+  });
+
+  it("wraps around when the last player in order leaves on their turn", () => {
+    const r = turnAfterLeave(order, 0, 3, "d");
+    expect(turnOf(r, 3)).toBe("a");
+  });
+
+  it("honours an existing skip offset", () => {
+    const r = turnAfterLeave(order, 2, 1, "a"); // index 3 -> "d" has the turn
+    expect(turnOf(r, 1)).toBe("d");
+  });
+
+  it("returns an empty order when nobody is left", () => {
+    expect(turnAfterLeave(["a"], 0, 0, "a")).toEqual({ order: [], offset: 0, currentId: null });
   });
 });

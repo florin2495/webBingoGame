@@ -88,6 +88,31 @@ export function countMarkedLines(cells: number[], n: number, marked: ReadonlySet
   return allLines(n).filter((line) => line.every((idx) => marked.has(cells[idx]))).length;
 }
 
+/**
+ * Turn order after `leavingId` leaves a running game. Whoever had the turn keeps it;
+ * if the leaver had it, it passes to the next player in the old order. The new offset
+ * makes currentTurnIndex(calledCount, offset, newOrder.length) point at that player.
+ */
+export function turnAfterLeave(
+  order: string[],
+  offset: number,
+  calledCount: number,
+  leavingId: string,
+): { order: string[]; offset: number; currentId: string | null } {
+  const newOrder = order.filter((id) => id !== leavingId);
+  if (newOrder.length === 0) return { order: newOrder, offset: 0, currentId: null };
+
+  let currentId: string | null = order.length ? order[currentTurnIndex(calledCount, offset, order.length)] : null;
+  if (currentId === leavingId || currentId === null) {
+    const i = order.indexOf(leavingId);
+    const after = [...order.slice(i + 1), ...order.slice(0, i)];
+    currentId = after.find((id) => newOrder.includes(id)) ?? newOrder[0];
+  }
+  const target = newOrder.indexOf(currentId);
+  const len = newOrder.length;
+  return { order: newOrder, offset: (((target - calledCount) % len) + len) % len, currentId };
+}
+
 /** Index into turn_order of the player whose turn it is. */
 export function currentTurnIndex(calledCount: number, turnOffset: number, playerCount: number): number {
   if (playerCount <= 0) return -1;

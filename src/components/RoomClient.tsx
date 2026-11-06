@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import {
   api,
@@ -135,7 +136,53 @@ function Room({ code, token }: { code: string; token: string }) {
       ) : (
         <Game state={state} token={token} refresh={refresh} />
       )}
+      <LeaveButton state={state} token={token} />
     </main>
+  );
+}
+
+function LeaveButton({ state, token }: { state: RoomState; token: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const { room, me, players } = state;
+  const isHost = room.hostPlayerId === me.id;
+  const alone = players.length <= 1;
+
+  async function leave() {
+    const warning = alone
+      ? "Ești singur în cameră. Dacă pleci, camera se închide. Continui?"
+      : room.status === "playing"
+        ? "Părăsești jocul în desfășurare. Nu mai poți reveni în runda asta. Continui?"
+        : isHost
+          ? "Ești host. Dacă pleci, următorul jucător devine host. Continui?"
+          : "Sigur vrei să părăsești camera?";
+    if (!window.confirm(warning)) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/api/rooms/${room.code}/leave`, { token, body: {} });
+    } catch (err) {
+      // 401/404: we are already out of the room - leaving locally is still correct.
+      if (!(err instanceof ApiRequestError && (err.status === 401 || err.status === 404))) {
+        setError(err instanceof Error ? err.message : "Eroare.");
+        setBusy(false);
+        return;
+      }
+    }
+    router.push("/");
+    clearSession(room.code);
+  }
+
+  return (
+    <div className="pb-6 pt-2 text-center">
+      <Button variant="danger" className="w-full" onClick={() => void leave()} disabled={busy}>
+        {busy ? "Se iese…" : room.status === "playing" ? "Părăsește jocul" : "Părăsește camera"}
+      </Button>
+      <div className="mt-2">
+        <ErrorText>{error}</ErrorText>
+      </div>
+    </div>
   );
 }
 

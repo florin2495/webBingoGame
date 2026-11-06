@@ -36,6 +36,7 @@ Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să n
 - **Culori:** numerele strigate de tine sunt verde deschis, cele strigate de alții verde închis.
 - **Final:** vezi cardurile celorlalți, cu bifele lor. Roșu înseamnă bifat, dar nestrigat.
 - **Reguli editabile:** host-ul poate schimba N și numărul de linii cât timp camera e în lobby (deci și după „Rundă nouă”). Schimbarea lui N șterge matricile pregătite. Orice schimbare resetează „ready”.
+- **Părăsește jocul:** oricine poate ieși din cameră. Dacă pleacă host-ul, devine host următorul jucător. În timpul jocului, tura trece mai departe fără să blocheze. Dacă rămâne un singur jucător, câștigă el. Când pleacă ultimul, camera se închide.
 - **Sunet:** un fragment audio (`public/sounds/line.mp3`) pornește când completezi o linie. Se poate opri din joc.
 
 ## Arhitectură, pe scurt
