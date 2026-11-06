@@ -30,6 +30,7 @@ export interface RoomRow {
   turn_offset: number;
   host_player_id: string | null;
   winner_player_id: string | null;
+  last_activity_at: string;
 }
 
 export interface PlayerRow {
@@ -38,7 +39,8 @@ export interface PlayerRow {
   nickname: string;
   is_host: boolean;
   ready: boolean;
+  hints_used: number;
   joined_at: string;
 }
 
-export const PLAYER_COLUMNS = "id, room_id, nickname, is_host, ready, joined_at";
+export const PLAYER_COLUMNS = "id, room_id, nickname, is_host, ready, hints_used, joined_at";

@@ -12,7 +12,10 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ne
     requireStatus(room, "finished");
 
     // Reset ready first: if the room update below fails, players just re-click ready.
-    const { error: playersError } = await db().from("players").update({ ready: false }).eq("room_id", room.id);
+    const { error: playersError } = await db()
+      .from("players")
+      .update({ ready: false, hints_used: 0 })
+      .eq("room_id", room.id);
     if (playersError) throw playersError;
 
     const { data, error } = await db()
@@ -24,6 +27,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ne
         turn_offset: 0,
         winner_player_id: null,
         updated_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
       })
       .eq("id", room.id)
       .eq("status", "finished")

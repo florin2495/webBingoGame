@@ -35,7 +35,12 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/va
     // Conditional update: the first valid claim wins, later ones see status != playing.
     const { data, error } = await db()
       .from("rooms")
-      .update({ status: "finished", winner_player_id: player.id, updated_at: new Date().toISOString() })
+      .update({
+        status: "finished",
+        winner_player_id: player.id,
+        updated_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(), // idle timer for the finished room starts now
+      })
       .eq("id", room.id)
       .eq("status", "playing")
       .select("id");

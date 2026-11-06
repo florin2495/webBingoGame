@@ -6,6 +6,28 @@ export const SIZE_DEFAULT = 7;
 export const LINES_MIN = 1;
 export const LINES_MAX = 3;
 export const MIN_PLAYERS_TO_START = 2;
+/** Lobby/finished rooms with no activity for this long are closed (deleted). */
+export const ROOM_IDLE_MINUTES = 60;
+export const HINTS_PER_ROUND = 3;
+export const HINT_HIGHLIGHT_MS = 5000;
+
+export function isRoomExpired(status: string, lastActivityAt: string | Date, now = Date.now()): boolean {
+  if (status !== "lobby" && status !== "finished") return false;
+  return now - new Date(lastActivityAt).getTime() > ROOM_IDLE_MINUTES * 60_000;
+}
+
+/**
+ * Turn order for a round: host first, then everyone else in join order,
+ * rotated so round 1 starts with the host, round 2 with the next player, etc.
+ */
+export function roundTurnOrder(playerIdsByJoin: string[], hostId: string | null, round: number): string[] {
+  const base = hostId && playerIdsByJoin.includes(hostId)
+    ? [hostId, ...playerIdsByJoin.filter((id) => id !== hostId)]
+    : [...playerIdsByJoin];
+  if (base.length === 0) return base;
+  const shift = (((round - 1) % base.length) + base.length) % base.length;
+  return [...base.slice(shift), ...base.slice(0, shift)];
+}
 
 export function isValidSize(n: unknown): n is number {
   return Number.isInteger(n) && (n as number) >= SIZE_MIN && (n as number) <= SIZE_MAX;
@@ -59,6 +81,11 @@ export function countValidLines(
   return allLines(n).filter((line) =>
     line.every((idx) => marked.has(cells[idx]) && called.has(cells[idx])),
   ).length;
+}
+
+/** Lines fully marked by the player, regardless of whether the numbers were called (used for the sound cue). */
+export function countMarkedLines(cells: number[], n: number, marked: ReadonlySet<number>): number {
+  return allLines(n).filter((line) => line.every((idx) => marked.has(cells[idx]))).length;
 }
 
 /** Index into turn_order of the player whose turn it is. */

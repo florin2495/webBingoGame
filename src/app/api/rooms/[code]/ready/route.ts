@@ -2,7 +2,7 @@ import { isValidBoard } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
 import { db } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
-import { getBoard, requireMember, requireStatus } from "@/lib/server/room";
+import { getBoard, requireMember, requireStatus, touchRoom } from "@/lib/server/room";
 
 // POST /api/rooms/[code]/ready - only with a complete saved board; locks the board.
 export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ready">) {
@@ -18,6 +18,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/re
     const { error } = await db().from("players").update({ ready: true }).eq("id", player.id);
     if (error) throw error;
 
+    await touchRoom(room.id);
     await notifyRoom(room.id, "player_ready");
     return { ok: true };
   });

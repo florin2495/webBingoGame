@@ -1,11 +1,44 @@
-import { isValidLinesToWin, isValidSize, SIZE_DEFAULT } from "@/lib/game";
+import { connection } from "next/server";
+import { isValidLinesToWin, isValidSize, ROOM_IDLE_MINUTES, SIZE_DEFAULT } from "@/lib/game";
 import { hashPassword, hashToken, newPlayerToken, newRoomCode } from "@/lib/server/crypto";
 import { db } from "@/lib/server/db";
 import { cleanText, fail, handle, isUniqueViolation, readJson } from "@/lib/server/http";
+import { cleanupExpiredRooms } from "@/lib/server/room";
+import type { RoomListItem } from "@/lib/types";
+
+// GET /api/rooms - public list of rooms that can be joined right now (lobby, not idle).
+export async function GET() {
+  await connection(); // always request-time, never prerendered at build
+  return handle(async () => {
+    await cleanupExpiredRooms();
+    const { data, error } = await db()
+      .from("rooms")
+      .select("code, name, size, lines_to_win, password_hash, last_activity_at, players!players_room_id_fkey(count)")
+      .eq("status", "lobby")
+      .order("last_activity_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    const now = Date.now();
+    const rooms: RoomListItem[] = (data ?? []).map((r) => ({
+      code: r.code,
+      name: r.name,
+      size: r.size,
+      linesToWin: r.lines_to_win,
+      hasPassword: r.password_hash !== null,
+      players: (r.players as unknown as { count: number }[])[0]?.count ?? 0,
+      minutesLeft: Math.max(
+        0,
+        Math.ceil(ROOM_IDLE_MINUTES - (now - new Date(r.last_activity_at).getTime()) / 60_000),
+      ),
+    }));
+    return { rooms };
+  });
+}
 
 // POST /api/rooms - create a room and its host player.
 export async function POST(req: Request) {
   return handle(async () => {
+    await cleanupExpiredRooms();
     const body = await readJson(req);
     const name = cleanText(body.name, "Numele camerei", 1, 40);
     const nickname = cleanText(body.nickname, "Nickname-ul", 1, 20);

@@ -1,4 +1,4 @@
-import { MIN_PLAYERS_TO_START } from "@/lib/game";
+import { MIN_PLAYERS_TO_START, roundTurnOrder } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
 import { db } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
@@ -22,7 +22,12 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/st
       .from("rooms")
       .update({
         status: "playing",
-        turn_order: players.map((p) => p.id),
+        // Round 1: host first, then join order. Each later round the first caller rotates by one.
+        turn_order: roundTurnOrder(
+          players.map((p) => p.id),
+          room.host_player_id,
+          room.round,
+        ),
         turn_offset: 0,
         winner_player_id: null,
         updated_at: new Date().toISOString(),

@@ -1,7 +1,7 @@
 import { generateBoard, isValidBoard } from "@/lib/game";
 import { db } from "@/lib/server/db";
 import { fail, handle, readJson } from "@/lib/server/http";
-import { requireMember, requireStatus } from "@/lib/server/room";
+import { requireMember, requireStatus, touchRoom } from "@/lib/server/room";
 
 // POST /api/rooms/[code]/board  { generate: true } | { cells: number[] }
 // Saves the caller's board for the current round. Locked once the player is ready.
@@ -29,6 +29,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/bo
         { onConflict: "player_id,round" },
       );
     if (error) throw error;
+    await touchRoom(room.id);
     return { board: cells };
   });
 }

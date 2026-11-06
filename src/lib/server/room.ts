@@ -1,24 +1,45 @@
 import "server-only";
-import { currentTurnIndex } from "@/lib/game";
-import type { CalledNumber, PublicPlayer, RoomState } from "@/lib/types";
+import { currentTurnIndex, HINTS_PER_ROUND, isRoomExpired, ROOM_IDLE_MINUTES } from "@/lib/game";
+import type { CalledNumber, PublicPlayer, RevealedBoard, RoomState } from "@/lib/types";
 import { hashToken } from "./crypto";
 import { db, PLAYER_COLUMNS, type PlayerRow, type RoomRow } from "./db";
 import { fail } from "./http";
 
 const ROOM_COLUMNS =
-  "id, code, name, password_hash, size, lines_to_win, status, round, turn_order, turn_offset, host_player_id, winner_player_id";
+  "id, code, name, password_hash, size, lines_to_win, status, round, turn_order, turn_offset, host_player_id, winner_player_id, last_activity_at";
+
+const GONE = `Camera nu există sau a fost închisă după ${ROOM_IDLE_MINUTES} de minute de inactivitate.`;
 
 export function normalizeCode(code: string): string {
   const c = decodeURIComponent(code).trim().toUpperCase();
-  if (!/^[A-Z2-9]{6}$/.test(c)) fail(404, "Camera nu există.");
+  if (!/^[A-Z2-9]{6}$/.test(c)) fail(404, GONE);
   return c;
 }
 
 export async function getRoomByCode(code: string): Promise<RoomRow> {
   const { data, error } = await db().from("rooms").select(ROOM_COLUMNS).eq("code", normalizeCode(code)).maybeSingle();
   if (error) throw error;
-  if (!data) fail(404, "Camera nu există.");
-  return data as RoomRow;
+  if (!data) fail(404, GONE);
+  const room = data as RoomRow;
+  // Lazy expiry: Vercel Hobby has no frequent cron, so idle rooms are closed when touched.
+  if (isRoomExpired(room.status, room.last_activity_at)) {
+    await db().from("rooms").delete().eq("id", room.id).eq("last_activity_at", room.last_activity_at);
+    fail(404, GONE);
+  }
+  return room;
+}
+
+/** Deletes every lobby/finished room idle for longer than ROOM_IDLE_MINUTES. */
+export async function cleanupExpiredRooms(): Promise<void> {
+  const cutoff = new Date(Date.now() - ROOM_IDLE_MINUTES * 60_000).toISOString();
+  const { error } = await db().from("rooms").delete().in("status", ["lobby", "finished"]).lt("last_activity_at", cutoff);
+  if (error) console.error("cleanup failed", error);
+}
+
+/** Records activity on a room, restarting its idle timer. */
+export async function touchRoom(roomId: string): Promise<void> {
+  const { error } = await db().from("rooms").update({ last_activity_at: new Date().toISOString() }).eq("id", roomId);
+  if (error) throw error;
 }
 
 /**
@@ -105,12 +126,28 @@ const toPublic = (p: PlayerRow): PublicPlayer => ({
   ready: p.ready,
 });
 
+/** All boards and marks of a round. Only ever sent to clients once the game is finished. */
+async function revealRound(roomId: string, round: number): Promise<RevealedBoard[]> {
+  const [boards, marks] = await Promise.all([
+    db().from("boards").select("player_id, cells").eq("room_id", roomId).eq("round", round),
+    db().from("marks").select("player_id, number").eq("room_id", roomId).eq("round", round),
+  ]);
+  if (boards.error) throw boards.error;
+  if (marks.error) throw marks.error;
+  return (boards.data ?? []).map((b) => ({
+    playerId: b.player_id as string,
+    board: b.cells as number[],
+    marks: (marks.data ?? []).filter((m) => m.player_id === b.player_id).map((m) => m.number as number),
+  }));
+}
+
 export async function buildState(room: RoomRow, me: PlayerRow): Promise<RoomState> {
-  const [players, called, board, marks] = await Promise.all([
+  const [players, called, board, marks, reveal] = await Promise.all([
     listPlayers(room.id),
     listCalled(room.id, room.round),
     getBoard(me.id, room.round),
     getMarks(me.id, room.round),
+    room.status === "finished" ? revealRound(room.id, room.round) : Promise.resolve(null),
   ]);
 
   let ordered = players;
@@ -138,5 +175,7 @@ export async function buildState(room: RoomRow, me: PlayerRow): Promise<RoomStat
     board,
     marks,
     called,
+    hintsLeft: Math.max(0, HINTS_PER_ROUND - (me.hints_used ?? 0)),
+    reveal,
   };
 }
