@@ -21,8 +21,10 @@ create table if not exists public.rooms (
   host_player_id   uuid,
   winner_player_id uuid,
   created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now()
+  updated_at       timestamptz not null default now(),
+  last_activity_at timestamptz not null default now()      -- lobby/finished rooms idle > 60 min are deleted
 );
+create index if not exists rooms_status_activity_idx on public.rooms (status, last_activity_at);
 
 -- ---------------------------------------------------------------------------
 -- players: members of a room. Identity = random token kept by the browser,
@@ -35,6 +37,7 @@ create table if not exists public.players (
   token_hash text not null unique,
   is_host    boolean not null default false,
   ready      boolean not null default false,
+  hints_used smallint not null default 0 check (hints_used between 0 and 3), -- reset every round
   joined_at  timestamptz not null default now()
 );
 create unique index if not exists players_room_nickname_uq on public.players (room_id, lower(nickname));
