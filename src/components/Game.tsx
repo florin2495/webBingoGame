@@ -185,6 +185,11 @@ export function Game({ state, token, refresh }: Props) {
             >
               Rundă nouă
             </Button>
+          ) : null}
+          {isHost ? (
+            <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+              În lobby poți schimba dimensiunea matricei și numărul de linii pentru runda următoare.
+            </p>
           ) : (
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
               Așteaptă ca host-ul să pornească o rundă nouă.

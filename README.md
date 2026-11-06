@@ -35,6 +35,7 @@ Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să n
 - **Confirmare la strigare:** o poți dezactiva. Atunci numărul apăsat pe tura ta se strigă imediat.
 - **Culori:** numerele strigate de tine sunt verde deschis, cele strigate de alții verde închis.
 - **Final:** vezi cardurile celorlalți, cu bifele lor. Roșu înseamnă bifat, dar nestrigat.
+- **Reguli editabile:** host-ul poate schimba N și numărul de linii cât timp camera e în lobby (deci și după „Rundă nouă”). Schimbarea lui N șterge matricile pregătite. Orice schimbare resetează „ready”.
 - **Sunet:** un fragment audio (`public/sounds/line.mp3`) pornește când completezi o linie. Se poate opri din joc.
 
 ## Arhitectură, pe scurt

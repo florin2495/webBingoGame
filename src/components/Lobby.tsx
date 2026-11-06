@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { api } from "@/lib/client/api";
-import { MIN_PLAYERS_TO_START, ROOM_IDLE_MINUTES, roundTurnOrder } from "@/lib/game";
+import {
+  LINES_MAX,
+  LINES_MIN,
+  MIN_PLAYERS_TO_START,
+  ROOM_IDLE_MINUTES,
+  roundTurnOrder,
+  SIZE_MAX,
+  SIZE_MIN,
+} from "@/lib/game";
 import type { RoomState } from "@/lib/types";
 import { Grid } from "./Grid";
 import { PlayerList } from "./PlayerList";
@@ -19,7 +27,9 @@ export function Lobby({ state, token, refresh }: Props) {
   const total = room.size * room.size;
   const base = `/api/rooms/${room.code}`;
 
-  const [manual, setManual] = useState<(number | null)[] | null>(null);
+  const [manualRaw, setManual] = useState<(number | null)[] | null>(null);
+  // If the host changes N mid-fill, the half-filled grid no longer fits: drop it.
+  const manual = manualRaw?.length === total ? manualRaw : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -75,6 +85,7 @@ export function Lobby({ state, token, refresh }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {isHost && <HostSettings key={`${room.size}-${room.linesToWin}`} state={state} token={token} refresh={refresh} />}
       <Card>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-bold">Matricea ta</h2>
@@ -182,4 +193,74 @@ function nextStarter(state: RoomState): string {
   const ids = state.players.map((p) => p.id);
   const order = roundTurnOrder(ids, state.room.hostPlayerId, state.room.round);
   return state.players.find((p) => p.id === order[0])?.nickname ?? "host-ul";
+}
+
+/** Host-only rules editor, available whenever the room is in the lobby (incl. right after "Rundă nouă"). */
+function HostSettings({ state, token, refresh }: Props) {
+  const { room, players } = state;
+  const [size, setSize] = useState(room.size);
+  const [lines, setLines] = useState(room.linesToWin);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const dirty = size !== room.size || lines !== room.linesToWin;
+  const othersPrepared = players.some((p) => p.ready);
+
+  async function save() {
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/api/rooms/${room.code}/settings`, { token, body: { size, linesToWin: lines } });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Eroare.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const select =
+    "min-h-11 rounded-lg border border-zinc-300 bg-white px-3 text-base dark:border-zinc-700 dark:bg-zinc-900";
+
+  return (
+    <Card>
+      <details open={room.round > 1 && !othersPrepared}>
+        <summary className="cursor-pointer font-bold">Regulile rundei (doar tu le poți schimba)</summary>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Matrice N×N
+            <select value={size} onChange={(e) => setSize(Number(e.target.value))} className={select}>
+              {Array.from({ length: SIZE_MAX - SIZE_MIN + 1 }, (_, i) => SIZE_MIN + i).map((n) => (
+                <option key={n} value={n}>
+                  {n}×{n} (1–{n * n})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Linii pentru câștig
+            <select value={lines} onChange={(e) => setLines(Number(e.target.value))} className={select}>
+              {Array.from({ length: LINES_MAX - LINES_MIN + 1 }, (_, i) => LINES_MIN + i).map((l) => (
+                <option key={l} value={l}>
+                  {l} {l === 1 ? "linie" : "linii"}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {dirty && (
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+            {size !== room.size
+              ? "Schimbarea dimensiunii șterge matricile deja pregătite. Toți vor trebui să le refacă și să apese din nou ready."
+              : "Toți vor trebui să apese din nou ready."}
+          </p>
+        )}
+        <Button className="mt-3 w-full" variant="secondary" onClick={() => void save()} disabled={busy || !dirty}>
+          Salvează regulile
+        </Button>
+        <div className="mt-2">
+          <ErrorText>{error}</ErrorText>
+        </div>
+      </details>
+    </Card>
+  );
 }
