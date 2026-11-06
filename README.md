@@ -24,6 +24,19 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime Broadcast), deploy pe Ver
 
 Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să nu se blocheze.
 
+### Extra
+
+- **Ordinea turelor:** în runda 1 începe host-ul, apoi ceilalți în ordinea intrării. La fiecare rundă nouă
+  începe următorul jucător (rotație).
+- **Lista de camere:** în „Intră în cameră” vezi camerele deschise și intri direct. Camerele cu parolă au 🔒.
+- **Închidere automată:** o cameră în lobby, sau terminată, se închide după 60 de minute fără activitate.
+- **Arată numerele ratate:** de 3 ori pe rundă, încercuiește cu galben, timp de 5 secunde, numerele strigate
+  pe care nu le-ai bifat. Dacă ești la zi, nu se consumă nicio utilizare.
+- **Confirmare la strigare:** o poți dezactiva. Atunci numărul apăsat pe tura ta se strigă imediat.
+- **Culori:** numerele strigate de tine sunt verde deschis, cele strigate de alții verde închis.
+- **Final:** vezi cardurile celorlalți, cu bifele lor. Roșu înseamnă bifat, dar nestrigat.
+- **Sunet:** un fragment audio (`public/sounds/line.mp3`) pornește când completezi o linie. Se poate opri din joc.
+
 ## Arhitectură, pe scurt
 
 - Toată logica de joc rulează în Route Handlers (`src/app/api/rooms/...`) cu **service role key**, doar pe server.
@@ -42,6 +55,7 @@ Detalii: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Schema: [supabase/schema.
 
 1. Creează un proiect pe [supabase.com](https://supabase.com) (planul Free e suficient).
 2. **SQL Editor → New query**: lipește tot conținutul din `supabase/schema.sql` și rulează.
+   Dacă baza ta a fost creată cu o versiune mai veche a schemei, rulează și fișierele din `supabase/migrations/`, în ordine.
 3. **Project Settings → API Keys**: copiază
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` / publishable key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`

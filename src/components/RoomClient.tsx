@@ -11,7 +11,9 @@ import {
   saveSession,
   subscribeSession,
 } from "@/lib/client/api";
+import { PREF_NICKNAME, useStringPref, writePref } from "@/lib/client/prefs";
 import { realtimeClient } from "@/lib/client/realtime";
+import { ROOM_IDLE_MINUTES } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
 import { Game } from "./Game";
 import { Lobby } from "./Lobby";
@@ -101,7 +103,10 @@ function Room({ code, token }: { code: string; token: string }) {
   if (missing) {
     return (
       <main className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-12 text-center">
-        <p className="text-lg font-semibold">Camera {code} nu există.</p>
+        <p className="text-lg font-semibold">Camera {code} nu mai există.</p>
+        <p className="text-sm text-zinc-500">
+          Camerele se închid automat după {ROOM_IDLE_MINUTES} de minute fără activitate.
+        </p>
         <Link href="/" className="font-semibold text-indigo-600 underline">
           Înapoi la început
         </Link>
@@ -182,7 +187,9 @@ function RoomHeader({ state }: { state: RoomState }) {
 }
 
 function JoinForm({ code }: { code: string }) {
-  const [nickname, setNickname] = useState("");
+  const stored = useStringPref(PREF_NICKNAME);
+  const [typed, setNickname] = useState<string | null>(null);
+  const nickname = typed ?? stored ?? "";
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -191,6 +198,7 @@ function JoinForm({ code }: { code: string }) {
     e.preventDefault();
     setBusy(true);
     setError("");
+    writePref(PREF_NICKNAME, nickname.trim());
     try {
       const res = await api<{ code: string; playerId: string; token: string }>(`/api/rooms/${code}/join`, {
         body: { nickname, password },

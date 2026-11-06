@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
 
 export function Button({
   variant = "primary",
@@ -22,7 +22,7 @@ export function Button({
   );
 }
 
-export function Field({ label, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+export function Field({ label, ...props }: ComponentProps<"input"> & { label: string }) {
   return (
     <label className="flex flex-col gap-1 text-sm font-medium">
       {label}
@@ -41,6 +41,36 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
     >
       {children}
     </section>
+  );
+}
+
+export function Toggle({
+  label,
+  checked,
+  onChange,
+  disabled,
+  hint,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  hint?: string;
+}) {
+  return (
+    <label className={`flex min-h-10 items-center gap-3 text-sm ${disabled ? "opacity-40" : "cursor-pointer"}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-5 w-5 shrink-0 accent-indigo-600"
+      />
+      <span>
+        <span className="font-medium">{label}</span>
+        {hint && <span className="block text-xs text-zinc-500">{hint}</span>}
+      </span>
+    </label>
   );
 }
 

@@ -1,9 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { api, saveSession } from "@/lib/client/api";
+import { PREF_NICKNAME, useStringPref, writePref } from "@/lib/client/prefs";
 import { LINES_MAX, LINES_MIN, SIZE_DEFAULT, SIZE_MAX, SIZE_MIN } from "@/lib/game";
+import type { RoomListItem } from "@/lib/types";
+import { RoomList } from "./RoomList";
 import { Button, Card, ErrorText, Field } from "./ui";
 
 interface JoinResult {
@@ -18,17 +21,34 @@ export function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const [nickname, setNickname] = useState("");
+  // Nickname defaults to the last one used on this device.
+  const storedNickname = useStringPref(PREF_NICKNAME);
+  const [typedNickname, setNickname] = useState<string | null>(null);
+  const nickname = typedNickname ?? storedNickname ?? "";
   const [roomName, setRoomName] = useState("");
   const [password, setPassword] = useState("");
   const [size, setSize] = useState(SIZE_DEFAULT);
   const [lines, setLines] = useState(1);
   const [code, setCode] = useState("");
+  const [picked, setPicked] = useState<RoomListItem | null>(null);
+  const nicknameRef = useRef<HTMLInputElement>(null);
+
+  function pickRoom(room: RoomListItem) {
+    setPicked(room);
+    setCode(room.code);
+    setPassword("");
+    setError("");
+    nicknameRef.current?.focus();
+  }
+
+  // Password field is hidden only when the picked room is known to have none.
+  const showPassword = tab === "create" || !(picked && picked.code === code && !picked.hasPassword);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
+    writePref(PREF_NICKNAME, nickname.trim());
     try {
       const res =
         tab === "create"
@@ -70,13 +90,24 @@ export function Home() {
         ))}
       </div>
 
+      {tab === "join" && (
+        <Card>
+          <h2 className="mb-3 font-bold">Camere disponibile</h2>
+          <RoomList
+            selected={picked?.code === code ? code : null}
+            onSelect={pickRoom}
+            onRejoin={(c) => router.push(`/room/${c}`)}
+          />
+        </Card>
+      )}
+
       <Card>
         <form onSubmit={submit} className="flex flex-col gap-4">
           {tab === "join" && (
             <Field
               label="Codul camerei"
               value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
               placeholder="ex. K7QM2X"
               maxLength={6}
               autoCapitalize="characters"
@@ -94,6 +125,7 @@ export function Home() {
             />
           )}
           <Field
+            ref={nicknameRef}
             label="Nickname-ul tău"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
@@ -101,14 +133,23 @@ export function Home() {
             autoComplete="nickname"
             required
           />
-          <Field
-            label={tab === "create" ? "Parolă (opțional)" : "Parolă (dacă are camera)"}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            maxLength={100}
-            autoComplete="off"
-          />
+          {showPassword && (
+            <Field
+              label={
+                tab === "create"
+                  ? "Parolă (opțional)"
+                  : picked?.code === code
+                    ? "Parola camerei"
+                    : "Parolă (dacă are camera)"
+              }
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              maxLength={100}
+              autoComplete="off"
+              required={tab === "join" && picked?.code === code && picked.hasPassword}
+            />
+          )}
 
           {tab === "create" && (
             <div className="grid grid-cols-2 gap-3">

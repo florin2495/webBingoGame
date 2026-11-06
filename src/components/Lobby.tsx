@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/client/api";
-import { MIN_PLAYERS_TO_START } from "@/lib/game";
+import { MIN_PLAYERS_TO_START, ROOM_IDLE_MINUTES, roundTurnOrder } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
 import { Grid } from "./Grid";
 import { PlayerList } from "./PlayerList";
@@ -168,7 +168,18 @@ export function Lobby({ state, token, refresh }: Props) {
             {players.find((p) => p.isHost)?.nickname ?? "Creatorul"} pornește jocul când toți sunt ready.
           </p>
         )}
+        <p className="mt-2 text-center text-xs text-zinc-500">
+          Runda {room.round} o începe <strong>{nextStarter(state)}</strong>. Camera se închide automat după{" "}
+          {ROOM_IDLE_MINUTES} de minute fără activitate.
+        </p>
       </Card>
     </div>
   );
+}
+
+/** Who calls first this round: same rule as the server (host first in round 1, then rotating). */
+function nextStarter(state: RoomState): string {
+  const ids = state.players.map((p) => p.id);
+  const order = roundTurnOrder(ids, state.room.hostPlayerId, state.room.round);
+  return state.players.find((p) => p.id === order[0])?.nickname ?? "host-ul";
 }
