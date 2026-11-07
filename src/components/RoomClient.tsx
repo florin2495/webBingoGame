@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import {
   api,
+  BASE_PATH,
   ApiRequestError,
   clearSession,
   deviceId,
@@ -241,7 +242,7 @@ function RoomHeader({ state }: { state: RoomState }) {
   const [copied, setCopied] = useState(false);
 
   async function invite() {
-    const url = `${window.location.origin}/room/${room.code}`;
+    const url = `${window.location.origin}${BASE_PATH}/room/${room.code}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: `Bingo: ${room.name}`, text: `Intră în camera ${room.code}`, url });

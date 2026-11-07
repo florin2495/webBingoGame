@@ -120,6 +120,14 @@ export class ApiRequestError extends Error {
   }
 }
 
+/** Base path of this zone ("/classicbingo"); fetch() does not apply Next's basePath. */
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
+/** Prefix a root-relative URL ("/api/...") with the base path. */
+export function withBase(path: string): string {
+  return path.startsWith("/") ? `${BASE_PATH}${path}` : path;
+}
+
 export async function api<T = { ok: true }>(
   path: string,
   opts: { token?: string; body?: unknown; method?: "GET" | "POST" } = {},
@@ -129,7 +137,7 @@ export async function api<T = { ok: true }>(
   if (opts.body !== undefined) headers["content-type"] = "application/json";
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await fetch(withBase(path), {
       method: opts.method ?? (opts.body !== undefined ? "POST" : "GET"),
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,

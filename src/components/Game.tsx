@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/lib/client/api";
+import { api, withBase } from "@/lib/client/api";
 import { PREF_CONFIRM_CALL, PREF_SOUND, useBoolPref } from "@/lib/client/prefs";
 import { countValidLines, HINT_HIGHLIGHT_MS, HINTS_PER_ROUND } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
@@ -15,7 +15,7 @@ interface Props {
   refresh: () => Promise<void>;
 }
 
-const LINE_SOUND = "/sounds/line.mp3";
+const LINE_SOUND = withBase("/sounds/line.mp3");
 const FADE_IN_S = 1;
 const FADE_OUT_S = 1.5;
 

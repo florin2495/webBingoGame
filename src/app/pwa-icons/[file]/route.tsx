@@ -1,6 +1,8 @@
 import { pwaIcon } from "@/lib/pwa-icon";
 
 const ICONS: Record<string, { size: number; safe: number }> = {
+  // apple-touch-icon (linked from layout metadata; an app/apple-icon.tsx URL misses basePath under Turbopack).
+  "apple-icon.png": { size: 180, safe: 0.84 },
   "icon-192.png": { size: 192, safe: 0.86 },
   "icon-512.png": { size: 512, safe: 0.86 },
   "icon-maskable-512.png": { size: 512, safe: 0.68 },

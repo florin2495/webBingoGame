@@ -12,9 +12,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 export const metadata: Metadata = {
   title: "Bingo",
   applicationName: "Bingo",
+  // Explicit + base-path-prefixed: metadata icon URLs are not prefixed automatically, and setting
+  // `icons` replaces the app/favicon.ico link, so it is listed here too.
+  icons: {
+    icon: [{ url: `${BASE}/favicon.ico`, sizes: "48x48", type: "image/x-icon" }],
+    apple: [{ url: `${BASE}/pwa-icons/apple-icon.png`, sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: { capable: true, title: "Bingo", statusBarStyle: "default" },
   other: { "apple-mobile-web-app-capable": "yes" },
   description: "Bingo multiplayer între prieteni, cu matrice N×N personalizabilă.",
