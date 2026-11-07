@@ -2,7 +2,9 @@
 
 import type { Session } from "@/lib/types";
 
-const key = (code: string) => `bingo:session:${code.toUpperCase()}`;
+const SESSION_PREFIX = "bingo:session:";
+const DEVICE_KEY = "bingo:device";
+const key = (code: string) => `${SESSION_PREFIX}${code.toUpperCase()}`;
 
 // In-memory fallback when localStorage is unavailable (private mode, blocked storage).
 const memory = new Map<string, string>();
@@ -56,6 +58,57 @@ export function clearSession(code: string) {
     // ignore
   }
   listeners.forEach((l) => l());
+}
+
+/** Every room this browser holds a session for (localStorage plus the memory fallback). */
+export function listSessions(): { code: string; session: Session }[] {
+  const keys = new Set(memory.keys());
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k) keys.add(k);
+    }
+  } catch {
+    // memory only
+  }
+  const out: { code: string; session: Session }[] = [];
+  for (const k of keys) {
+    if (!k.startsWith(SESSION_PREFIX)) continue;
+    const code = k.slice(SESSION_PREFIX.length);
+    const session = parseSession(readSessionRaw(code));
+    if (session) out.push({ code, session });
+  }
+  return out;
+}
+
+function randomUuid(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  // randomUUID needs a secure context (plain-http LAN dev); build a v4 UUID by hand.
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+/** Stable random id of this browser, sent on create/join so the same device can reclaim its seat. */
+export function deviceId(): string {
+  let id: string | null | undefined = memory.get(DEVICE_KEY);
+  try {
+    id = localStorage.getItem(DEVICE_KEY) ?? id;
+  } catch {
+    // memory fallback
+  }
+  if (!id) {
+    id = randomUuid();
+    try {
+      localStorage.setItem(DEVICE_KEY, id);
+    } catch {
+      // memory fallback below
+    }
+  }
+  memory.set(DEVICE_KEY, id);
+  return id;
 }
 
 export class ApiRequestError extends Error {

@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { isDeviceId } from "@/lib/reconnect";
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
 
@@ -10,6 +11,11 @@ export function newPlayerToken(): string {
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+/** sha256 of the browser's device id (lower-cased); null when absent or malformed (old clients). */
+export function hashDeviceId(deviceId: unknown): string | null {
+  return isDeviceId(deviceId) ? hashToken(deviceId.toLowerCase()) : null;
 }
 
 export async function hashPassword(password: string): Promise<string> {

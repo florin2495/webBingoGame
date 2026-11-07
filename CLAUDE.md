@@ -24,6 +24,7 @@ so this list is the source of truth. **Update it whenever the user confirms a mi
 | `supabase/migrations/003_five_hints.sql` | yes (2026-11-06, verified) | `hints_used` check 0..5 |
 | `supabase/migrations/004_classicbingo_prefix.sql` | yes (2026-11-06, verified) | renames all tables/constraints/indexes to `classicbingo_*`; breaks code < 1.2.3, deploy 1.2.3 right after |
 | `supabase/migrations/005_pending_kick.sql` | yes (2026-11-07, verified) | `classicbingo_players.kick_requested_at` (pending kick with 10 s "Ignoră"); run BEFORE deploying the code that reads it - until then every players query (and local dev, same DB) fails |
+| `supabase/migrations/006_reconnect.sql` | yes (2026-11-07, verified: service role 200, anon 401) | `classicbingo_players.last_seen_at`, `device_hash` + index (rejoin the same seat). Run BEFORE deploying the code that reads it - `PLAYER_COLUMNS` selects `last_seen_at`, so every players query fails until then |
 
 Rules for schema changes:
 - The Supabase project is shared by all hub mini-games: every object of this game is prefixed `classicbingo_`
@@ -33,6 +34,13 @@ Rules for schema changes:
 - Code that needs a migration must not be pushed until the user has run it. Verify it by effect with the
   service key from `.env.local` (e.g. select the new column, or try a value the new constraint allows).
 - Never print or commit the keys in `.env.local`.
+
+## Rejoin the same seat
+- `src/lib/reconnect.ts`: every member request stamps `last_seen_at` (at most every 10 s, in `requireMember`);
+  re-joining with an existing nickname reclaims that seat (same player id, new token) from the same device
+  (`device_hash`, from the browser's `bingo:device` id) or once the seat has been unseen for 45 s, also mid-game.
+  `/state` exposes only a derived `connected` flag ("deconectat" badge); never select `token_hash`/`device_hash`
+  into `PLAYER_COLUMNS`.
 
 ## Testing
 - `npm test` (Vitest, pure rules in `src/lib/game.ts`), `npx tsc --noEmit`, `npx eslint src`, `npx next build`.

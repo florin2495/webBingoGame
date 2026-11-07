@@ -52,7 +52,7 @@ supabase.channel("room:<id>") ◀───────────────�
 | Metodă | Rută | Cine | Ce face |
 | --- | --- | --- | --- |
 | POST | `/api/rooms` | oricine | creează camera + jucătorul host |
-| POST | `/[code]/join` | oricine | intră în cameră (doar în lobby) |
+| POST | `/[code]/join` | oricine | intră în cameră (doar în lobby); cu nickname-ul unui loc existent îl reia (același dispozitiv sau loc deconectat ≥ 45 s), și în timpul jocului |
 | GET | `/[code]/state` | membru | starea camerei + matricea și bifările proprii |
 | POST | `/[code]/board` | membru, lobby, ne-ready | `{generate:true}` sau `{cells:[...]}` |
 | POST | `/[code]/ready` | membru, lobby, matrice salvată | marchează ready, blochează matricea |

@@ -112,6 +112,7 @@ describe("room expiry", () => {
   });
   it("labels minutes in Romanian", () => {
     expect(minutesLabel(2)).toBe("2 minute");
+    expect(minutesLabel(10)).toBe("10 minute");
     expect(minutesLabel(60)).toBe("60 de minute");
     expect(minutesLabel(1)).toBe("1 minut");
   });

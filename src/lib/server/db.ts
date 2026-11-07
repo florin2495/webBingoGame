@@ -54,6 +54,9 @@ export interface PlayerRow {
   hints_used: number;
   kick_requested_at: string | null;
   joined_at: string;
+  /** Presence stamp, touched by requireMember. Needs migration 006_reconnect.sql. */
+  last_seen_at: string;
 }
 
-export const PLAYER_COLUMNS = "id, room_id, nickname, is_host, ready, hints_used, kick_requested_at, joined_at";
+/** Never add token_hash / device_hash here: these rows feed the public state. */
+export const PLAYER_COLUMNS = "id, room_id, nickname, is_host, ready, hints_used, kick_requested_at, joined_at, last_seen_at";

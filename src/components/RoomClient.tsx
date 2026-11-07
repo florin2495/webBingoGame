@@ -7,6 +7,7 @@ import {
   api,
   ApiRequestError,
   clearSession,
+  deviceId,
   parseSession,
   readSessionRaw,
   saveSession,
@@ -25,6 +26,10 @@ import { SettingsPanel } from "./SettingsPanel";
 import { Button, Card, ErrorText, Field } from "./ui";
 
 const POLL_MS = 15_000;
+/** Back after being hidden/offline this long: rebuild the Realtime channel (the socket is likely dead). */
+const RECONNECT_AFTER_MS = 5_000;
+/** Delay before rebuilding a channel that reported an error, so a broken socket does not spin. */
+const CHANNEL_RETRY_MS = 3_000;
 const removedKey = (code: string) => `bingo:removed:${code}`;
 const SERVER_SNAPSHOT = "__server__";
 
@@ -63,7 +68,9 @@ function useRoomState(code: string, token: string) {
     } catch (err) {
       if (id !== latest.current) return;
       if (err instanceof ApiRequestError && err.status === 401) {
-        writePref(removedKey(code), "1"); // kicked (or session gone): explain it on the join form
+        // Another tab may already hold a newer token for this room (seat reclaimed): keep that one.
+        if (parseSession(readSessionRaw(code))?.token !== token) return;
+        writePref(removedKey(code), "1"); // kicked, expired or taken over: explain it on the join form
         clearSession(code); // token no longer valid for this room -> show join form
       } else if (err instanceof ApiRequestError && err.status === 404) {
         setMissing(true);
@@ -73,17 +80,38 @@ function useRoomState(code: string, token: string) {
     }
   }, [code, token]);
 
-  // Initial load, polling fallback, refresh when the tab becomes visible again.
+  // Bumping this tears the Realtime channel down and subscribes again (phones kill sockets in the background).
+  const [reconnectKey, setReconnectKey] = useState(0);
+
+  // Initial load, polling fallback, refresh when the page comes back (tab visible, bfcache restore, network).
   useEffect(() => {
     const kick = () => void refresh();
     const timer = window.setTimeout(kick, 0);
     const interval = window.setInterval(kick, POLL_MS);
-    const onVisible = () => document.visibilityState === "visible" && kick();
-    document.addEventListener("visibilitychange", onVisible);
+    let awaySince: number | null = null;
+    const away = () => {
+      awaySince ??= Date.now();
+    };
+    const back = (forceReconnect = false) => {
+      const longAway = awaySince !== null && Date.now() - awaySince > RECONNECT_AFTER_MS;
+      awaySince = null;
+      kick();
+      if (forceReconnect || longAway) setReconnectKey((k) => k + 1);
+    };
+    const onVisibility = () => (document.visibilityState === "visible" ? back() : away());
+    const onPageShow = (e: PageTransitionEvent) => e.persisted && back(true);
+    const onOnline = () => back();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", away);
     return () => {
       window.clearTimeout(timer);
       window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisible);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", away);
     };
   }, [refresh]);
 
@@ -92,16 +120,24 @@ function useRoomState(code: string, token: string) {
   useEffect(() => {
     const client = realtimeClient();
     if (!roomId || !client) return;
+    let disposed = false;
+    let retry: number | undefined;
     const channel = client
       .channel(`room:${roomId}`)
       .on("broadcast", { event: "refresh" }, () => void refresh())
       .subscribe((status) => {
+        if (disposed) return; // CLOSED from our own cleanup
         if (status === "SUBSCRIBED") void refresh(); // catch anything missed while connecting
+        if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") && retry === undefined) {
+          retry = window.setTimeout(() => setReconnectKey((k) => k + 1), CHANNEL_RETRY_MS);
+        }
       });
     return () => {
+      disposed = true;
+      window.clearTimeout(retry);
       void client.removeChannel(channel);
     };
-  }, [roomId, refresh]);
+  }, [roomId, refresh, reconnectKey]);
 
   return { state, receivedAt, error, missing, refresh };
 }
@@ -266,7 +302,7 @@ function JoinForm({ code }: { code: string }) {
     writePref(PREF_NICKNAME, nickname.trim());
     try {
       const res = await api<{ code: string; playerId: string; token: string }>(`/api/rooms/${code}/join`, {
-        body: { nickname, password },
+        body: { nickname, password, deviceId: deviceId() },
       });
       writePref(removedKey(code), "0");
       saveSession(res.code, { playerId: res.playerId, token: res.token });
@@ -283,7 +319,8 @@ function JoinForm({ code }: { code: string }) {
       </h1>
       {removed && (
         <p role="status" className="rounded-lg bg-amber-100 px-3 py-2 text-center text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          Nu mai ești în cameră: ai fost scos de host sau sesiunea ta a expirat. Poți reintra cât camera e în lobby.
+          Nu mai ești în cameră: ai fost scos de host, sesiunea ta a expirat sau a fost preluată pe alt dispozitiv. Dacă locul
+          tău mai există, intră cu același nickname ca să îl reiei.
         </p>
       )}
       <Card>

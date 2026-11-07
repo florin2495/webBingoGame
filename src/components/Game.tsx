@@ -6,7 +6,7 @@ import { PREF_CONFIRM_CALL, PREF_SOUND, useBoolPref } from "@/lib/client/prefs";
 import { countValidLines, HINT_HIGHLIGHT_MS, HINTS_PER_ROUND } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
 import { Grid, type CellState } from "./Grid";
-import { PlayerList } from "./PlayerList";
+import { OfflineBadge, PlayerList } from "./PlayerList";
 import { Button, Card, ErrorText } from "./ui";
 
 interface Props {
@@ -337,6 +337,12 @@ export function Game({ state, token, refresh }: Props) {
               }`}
             >
               Tura: <strong>{myTurn ? "tu" : (turnName ?? "—")}</strong>
+              {!myTurn && (
+                <>
+                  {" "}
+                  <OfflineBadge connected={players.find((p) => p.id === room.currentTurnPlayerId)?.connected} />
+                </>
+              )}
             </span>
           )}
         </div>

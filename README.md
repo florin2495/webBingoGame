@@ -29,7 +29,7 @@ Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să n
 - **Ordinea turelor:** în runda 1 începe host-ul, apoi ceilalți în ordinea intrării. La fiecare rundă nouă
   începe următorul jucător (rotație).
 - **Lista de camere:** în „Intră în cameră” vezi camerele deschise și intri direct. Camerele cu parolă au 🔒.
-- **Închidere automată:** o cameră în lobby, sau terminată, se închide după 2 minute în care nimeni nu o mai are deschisă (fiecare pagină deschisă trimite un semnal de prezență la 15 secunde). Jocurile în desfășurare nu se închid automat.
+- **Închidere automată:** o cameră în lobby, sau terminată, se închide după 10 minute în care nimeni nu o mai are deschisă (fiecare pagină deschisă trimite un semnal de prezență la 15 secunde). Jocurile în desfășurare nu se închid automat.
 - **Arată numerele ratate:** de 5 ori pe rundă, încercuiește cu galben, timp de 5 secunde, numerele strigate
   pe care nu le-ai bifat. Dacă ești la zi, nu se consumă nicio utilizare.
 - **Confirmare la strigare:** o poți dezactiva. Atunci numărul apăsat pe tura ta se strigă imediat.
@@ -37,7 +37,8 @@ Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să n
 - **Final:** vezi cardurile celorlalți, cu bifele lor. Roșu înseamnă bifat, dar nestrigat.
 - **Reguli editabile:** host-ul poate schimba N și numărul de linii cât timp camera e în lobby (deci și după „Rundă nouă”). Schimbarea lui N șterge matricile pregătite. Orice schimbare resetează „ready”.
 - **Părăsește jocul:** oricine poate ieși din cameră. Dacă pleacă host-ul, devine host următorul jucător. În timpul jocului, tura trece mai departe fără să blocheze. Dacă rămâne un singur jucător, câștigă el. Când pleacă ultimul, camera se închide.
-- **Kick:** host-ul poate scoate un jucător (butonul „Scoate”). Nu e ban: poate reintra cât camera e în lobby. Parola camerei e protecția reală.
+- **Kick:** host-ul poate scoate un jucător (butonul „Scoate”). Nu e ban: poate reintra cât camera e în lobby.
+- **Revino pe locul tău:** dacă pierzi conexiunea sau închizi tab-ul, intri din nou cu același nickname și îți reiei locul (aceeași matrice, aceleași bife, aceeași tură), chiar și în timpul jocului. De pe același dispozitiv merge oricând; de pe alt dispozitiv, după 45 de secunde fără semnal („deconectat” în listă). Pe pagina de start apare „Revino în camera …” pentru camerele în care ai încă loc. Parola camerei e protecția reală.
 - **Sunet:** un fragment audio (`public/sounds/line.mp3`) pornește când completezi o linie. Se poate opri din joc.
 
 ## Arhitectură, pe scurt

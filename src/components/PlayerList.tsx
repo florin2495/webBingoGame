@@ -14,6 +14,16 @@ interface Props {
   refresh?: () => Promise<void>;
 }
 
+/** Shown next to a player not seen for 45 s (phone in the background, closed tab, no network). */
+export function OfflineBadge({ connected }: { connected: boolean | undefined }) {
+  if (connected !== false) return null;
+  return (
+    <span className="shrink-0 rounded bg-zinc-200 px-1.5 text-[10px] font-semibold uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+      deconectat
+    </span>
+  );
+}
+
 /** "iese în N s" next to a player whose kick is pending (live countdown, refreshes once at 0). */
 function KickBadge({ remainingMs, refresh }: { remainingMs: number; refresh?: () => Promise<void> }) {
   const receivedAt = useContext(StateClockContext);
@@ -76,6 +86,7 @@ export function PlayerList({ state, mode, token, refresh }: Props) {
                     host
                   </span>
                 )}
+                <OfflineBadge connected={p.connected} />
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 {mode === "lobby" ? (

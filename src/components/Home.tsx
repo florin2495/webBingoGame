@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
-import { api, saveSession } from "@/lib/client/api";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { api, ApiRequestError, clearSession, deviceId, listSessions, parseSession, readSessionRaw, saveSession } from "@/lib/client/api";
 import { PREF_NICKNAME, useStringPref, writePref } from "@/lib/client/prefs";
 import { LINES_MAX, LINES_MIN, NICKNAME_MAX, SIZE_DEFAULT, SIZE_MAX, SIZE_MIN } from "@/lib/game";
-import type { RoomListItem } from "@/lib/types";
+import type { RoomListItem, RoomState } from "@/lib/types";
 import { FeedbackButton } from "./FeedbackButton";
 import { RoomList } from "./RoomList";
 import { Button, Card, ErrorText, Field } from "./ui";
@@ -47,6 +47,12 @@ export function Home() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const joinCode = code.trim().toUpperCase();
+    // Already a member on this device: go back to the seat instead of joining again.
+    if (tab === "join" && parseSession(readSessionRaw(joinCode))) {
+      router.push(`/room/${joinCode}`);
+      return;
+    }
     setBusy(true);
     setError("");
     writePref(PREF_NICKNAME, nickname.trim());
@@ -54,10 +60,10 @@ export function Home() {
       const res =
         tab === "create"
           ? await api<JoinResult>("/api/rooms", {
-              body: { name: roomName, nickname, password, size, linesToWin: lines },
+              body: { name: roomName, nickname, password, size, linesToWin: lines, deviceId: deviceId() },
             })
-          : await api<JoinResult>(`/api/rooms/${encodeURIComponent(code.trim().toUpperCase())}/join`, {
-              body: { nickname, password },
+          : await api<JoinResult>(`/api/rooms/${encodeURIComponent(joinCode)}/join`, {
+              body: { nickname, password, deviceId: deviceId() },
             });
       saveSession(res.code, { playerId: res.playerId, token: res.token });
       router.push(`/room/${res.code}`);
@@ -79,6 +85,8 @@ export function Home() {
         <h1 className="text-4xl font-black tracking-tight">Bingo</h1>
         <p className="mt-1 text-sm text-zinc-500">Bingo-ul de pe hârtie, jucat cu prietenii, pe telefon.</p>
       </header>
+
+      <RejoinCards onRejoin={(c) => router.push(`/room/${c}`)} />
 
       <div className="grid grid-cols-2 gap-2 rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="tablist">
         {(["create", "join"] as const).map((t) => (
@@ -209,5 +217,59 @@ export function Home() {
         </ol>
       </details>
     </main>
+  );
+}
+
+/**
+ * Rooms this device still has a valid seat in (lobby or a running game, which the public list does not
+ * show). Stored sessions are checked once against /state; 401/404 ones are dropped.
+ */
+function RejoinCards({ onRejoin }: { onRejoin: (code: string) => void }) {
+  const [rooms, setRooms] = useState<{ code: string; name: string; status: RoomState["room"]["status"] }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const checks = await Promise.all(
+        listSessions().map(async ({ code, session }) => {
+          try {
+            const s = await api<RoomState>(`/api/rooms/${code}/state`, { token: session.token });
+            return { code, name: s.room.name, status: s.room.status };
+          } catch (err) {
+            if (err instanceof ApiRequestError && (err.status === 401 || err.status === 404)) clearSession(code);
+            return null;
+          }
+        }),
+      );
+      if (!cancelled) setRooms(checks.filter((r) => r !== null));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (rooms.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      {rooms.map((r) => (
+        <button
+          key={r.code}
+          type="button"
+          onClick={() => onRejoin(r.code)}
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-left dark:border-indigo-800 dark:bg-indigo-950"
+        >
+          <span className="min-w-0">
+            <span className="block font-bold">
+              Revino în camera <span className="font-mono tracking-widest">{r.code}</span>
+            </span>
+            <span className="block truncate text-xs text-zinc-600 dark:text-zinc-400">
+              {r.name}
+              {r.status === "playing" ? " · joc în desfășurare" : r.status === "finished" ? " · rundă terminată" : ""}
+            </span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold text-indigo-600 dark:text-indigo-400">Reintră →</span>
+        </button>
+      ))}
+    </div>
   );
 }
