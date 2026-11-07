@@ -14,6 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Bingo",
+  applicationName: "Bingo",
+  appleWebApp: { capable: true, title: "Bingo", statusBarStyle: "default" },
   description: "Bingo multiplayer între prieteni, cu matrice N×N personalizabilă.",
 };
 
