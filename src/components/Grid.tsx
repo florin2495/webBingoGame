@@ -5,7 +5,7 @@
  * plain    - not marked
  * mine     - marked, a number I called (light green)
  * marked   - marked, called by someone else (dark green)
- * wrong    - marked but never called (only shown in the end-of-game reveal)
+ * wrong    - marked but never called (end-of-game reveal, and while "Show" is active)
  * selected - chosen to be called, waiting for confirmation
  * hint     - called but not marked yet, highlighted by the "catch up" helper
  */

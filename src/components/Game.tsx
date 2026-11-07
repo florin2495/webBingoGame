@@ -109,6 +109,8 @@ export function Game({ state, token, refresh }: Props) {
   }, [state.marks, pending]);
   const nick = useMemo(() => new Map(players.map((p) => [p.id, p.nickname])), [players]);
   const missed = useMemo(() => called.filter((c) => !marked.has(c.number)).length, [called, marked]);
+  // Marked but never called: these make a line invalid at validation.
+  const wrongMarks = useMemo(() => [...marked].filter((n) => !calledSet.has(n)).length, [marked, calledSet]);
 
   // A selection is only meaningful while it is still my turn and the number is still free.
   const pick = myTurn && selected !== null && !calledSet.has(selected) ? selected : null;
@@ -193,8 +195,8 @@ export function Game({ state, token, refresh }: Props) {
       setHintOn(false);
       return;
     }
-    if (missed === 0) {
-      setNotice("Ești la zi: ai bifat toate numerele strigate. Nu am consumat niciun ajutor.");
+    if (missed === 0 && wrongMarks === 0) {
+      setNotice("Ești la zi: ai bifat toate numerele strigate și nimic nestrigat. Nu am consumat niciun ajutor.");
       return;
     }
     void act(async () => {
@@ -214,6 +216,7 @@ export function Game({ state, token, refresh }: Props) {
   function cellState(v: number | null): CellState {
     if (v === null) return "plain";
     if (v === pick) return "selected";
+    if (hintOn && marked.has(v) && !calledSet.has(v)) return "wrong";
     if (marked.has(v)) return calledByMe.has(v) ? "mine" : "marked";
     if (hintOn && calledSet.has(v)) return "hint";
     return "plain";
@@ -293,7 +296,7 @@ export function Game({ state, token, refresh }: Props) {
                 className={`flex-1 basis-0 ${hintOn ? "ring-2 ring-yellow-400" : ""}`}
                 onClick={() => setHint(!hintOn)}
                 disabled={busy || (!hintOn && state.hintsLeft === 0)}
-                title={`Încercuiește cu galben, ${HINT_HIGHLIGHT_MS / 1000} secunde, numerele strigate pe care nu le-ai bifat.`}
+                title={`Timp de ${HINT_HIGHLIGHT_MS / 1000} secunde: galben = strigate dar nebifate, roșu = bifate dar nestrigate.`}
               >
                 Show {state.hintsLeft}/{HINTS_PER_ROUND}
               </Button>
