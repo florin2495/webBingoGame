@@ -44,6 +44,10 @@ Rules for schema changes:
 
 ## Testing
 - `npm test` (Vitest, pure rules in `src/lib/game.ts`), `npx tsc --noEmit`, `npx eslint src`, `npx next build`.
-- End-to-end: drive the real API with two or three players (create, join, board, ready, start, call, mark,
-  hint, validate, new-round, settings, leave, kick, idle expiry) against `npm run dev` and, after deploy,
-  against production. Delete the test rooms afterwards.
+- End-to-end: `node scripts/e2e.mjs [baseUrl]` (default production `https://games.hailatat.icu/classicbingo`;
+  local: `http://localhost:3000/classicbingo`). Checks page / `_next` assets / version / manifest / icons /
+  `room/XXXXXX` over HTTP and that `web-bingo-game.vercel.app/classicbingo` serves the same build, then drives the
+  real API with 3 players: create (password), join, wrong password, rejoin (saved token, same device, old token dead,
+  mid-game), settings, boards, ready, start, out-of-turn / illegal calls, private boards and marks, hint, kick with
+  "Ignoră", skip, full game to a validated win, reveal, new round, pending kick enforced, leave mid-game (last one
+  wins), lobby kick. Rooms are named `e2e-test-…` and deleted at the end; it never calls `/api/feedback`.
