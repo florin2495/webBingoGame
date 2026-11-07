@@ -1,9 +1,11 @@
 import "server-only";
 import { currentTurnIndex, HINTS_PER_ROUND, isRoomExpired, minutesLabel, ROOM_IDLE_MINUTES } from "@/lib/game";
+import { kickRemainingMs } from "@/lib/kick";
 import type { CalledNumber, PublicPlayer, RevealedBoard, RoomState } from "@/lib/types";
 import { hashToken } from "./crypto";
 import { db, PLAYER_COLUMNS, type PlayerRow, type RoomRow, T } from "./db";
 import { fail } from "./http";
+import { enforceExpiredKicks } from "./kicks";
 
 const ROOM_COLUMNS =
   "id, code, name, password_hash, size, lines_to_win, status, round, turn_order, turn_offset, host_player_id, winner_player_id, last_activity_at";
@@ -49,7 +51,7 @@ export async function touchRoom(roomId: string): Promise<void> {
 export async function requireMember(req: Request, code: string): Promise<{ room: RoomRow; player: PlayerRow }> {
   const token = req.headers.get("x-player-token");
   if (!token || token.length > 200) fail(401, "Nu ești în această cameră.");
-  const room = await getRoomByCode(code);
+  const room = await enforceExpiredKicks(await getRoomByCode(code), code);
   const { data, error } = await db()
     .from(T.players)
     .select(PLAYER_COLUMNS)
@@ -119,11 +121,12 @@ export function turnPlayerId(room: RoomRow, calledCount: number): string | null 
   return room.turn_order[currentTurnIndex(calledCount, room.turn_offset, room.turn_order.length)] ?? null;
 }
 
-const toPublic = (p: PlayerRow): PublicPlayer => ({
+const toPublic = (p: PlayerRow, now: number): PublicPlayer => ({
   id: p.id,
   nickname: p.nickname,
   isHost: p.is_host,
   ready: p.ready,
+  kickRemainingMs: kickRemainingMs(p.kick_requested_at, now),
 });
 
 /** All boards and marks of a round. Only ever sent to clients once the game is finished. */
@@ -142,6 +145,7 @@ async function revealRound(roomId: string, round: number): Promise<RevealedBoard
 }
 
 export async function buildState(room: RoomRow, me: PlayerRow): Promise<RoomState> {
+  const now = Date.now();
   const [players, called, board, marks, reveal] = await Promise.all([
     listPlayers(room.id),
     listCalled(room.id, room.round),
@@ -170,8 +174,8 @@ export async function buildState(room: RoomRow, me: PlayerRow): Promise<RoomStat
       winnerPlayerId: room.winner_player_id,
       currentTurnPlayerId: turnPlayerId(room, called.length),
     },
-    players: ordered.map(toPublic),
-    me: toPublic(me),
+    players: ordered.map((p) => toPublic(p, now)),
+    me: toPublic(me, now),
     board,
     marks,
     called,

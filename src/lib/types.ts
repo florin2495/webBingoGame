@@ -5,6 +5,8 @@ export interface PublicPlayer {
   nickname: string;
   isHost: boolean;
   ready: boolean;
+  /** Ms left of a pending kick (host kicked this player mid-game), null = none. Max KICK_GRACE_MS. */
+  kickRemainingMs: number | null;
 }
 
 export interface CalledNumber {

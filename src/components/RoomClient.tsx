@@ -16,8 +16,10 @@ import { PREF_NICKNAME, useStringPref, writePref } from "@/lib/client/prefs";
 import { realtimeClient } from "@/lib/client/realtime";
 import { minutesLabel, NICKNAME_MAX, ROOM_IDLE_MINUTES } from "@/lib/game";
 import type { RoomState } from "@/lib/types";
+import { StateClockContext } from "@/lib/client/kick";
 import { FeedbackButton } from "./FeedbackButton";
 import { Game } from "./Game";
+import { KickModal } from "./KickModal";
 import { Lobby } from "./Lobby";
 import { SettingsPanel } from "./SettingsPanel";
 import { Button, Card, ErrorText, Field } from "./ui";
@@ -45,6 +47,7 @@ function Loading() {
 
 function useRoomState(code: string, token: string) {
   const [state, setState] = useState<RoomState | null>(null);
+  const [receivedAt, setReceivedAt] = useState(0); // when `state` arrived: kick countdowns run from it
   const [error, setError] = useState("");
   const [missing, setMissing] = useState(false);
   const latest = useRef(0);
@@ -55,6 +58,7 @@ function useRoomState(code: string, token: string) {
       const s = await api<RoomState>(`/api/rooms/${code}/state`, { token });
       if (id !== latest.current) return; // a newer request already answered
       setState(s);
+      setReceivedAt(Date.now());
       setError("");
     } catch (err) {
       if (id !== latest.current) return;
@@ -99,11 +103,11 @@ function useRoomState(code: string, token: string) {
     };
   }, [roomId, refresh]);
 
-  return { state, error, missing, refresh };
+  return { state, receivedAt, error, missing, refresh };
 }
 
 function Room({ code, token }: { code: string; token: string }) {
-  const { state, error, missing, refresh } = useRoomState(code, token);
+  const { state, receivedAt, error, missing, refresh } = useRoomState(code, token);
 
   if (missing) {
     return (
@@ -132,6 +136,7 @@ function Room({ code, token }: { code: string; token: string }) {
   }
 
   return (
+    <StateClockContext.Provider value={receivedAt}>
     <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 py-4">
       <RoomHeader state={state} />
       {error && <ErrorText>Conexiune instabilă: {error}</ErrorText>}
@@ -142,7 +147,11 @@ function Room({ code, token }: { code: string; token: string }) {
       )}
       <SettingsPanel />
       <LeaveButton state={state} token={token} />
+      {state.me.kickRemainingMs !== null && (
+        <KickModal code={code} token={token} remainingMs={state.me.kickRemainingMs} receivedAt={receivedAt} refresh={refresh} />
+      )}
     </main>
+    </StateClockContext.Provider>
   );
 }
 

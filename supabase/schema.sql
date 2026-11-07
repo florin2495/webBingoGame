@@ -41,6 +41,7 @@ create table if not exists public.classicbingo_players (
   ready      boolean not null default false,
   hints_used smallint not null default 0                                 -- reset every round
              constraint classicbingo_players_hints_used_range check (hints_used between 0 and 5),
+  kick_requested_at timestamptz,                                         -- pending kick (null = none), see migration 005
   joined_at  timestamptz not null default now()
 );
 create unique index if not exists classicbingo_players_room_nickname_uq on public.classicbingo_players (room_id, lower(nickname));

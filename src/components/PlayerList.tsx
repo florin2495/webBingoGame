@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { api } from "@/lib/client/api";
+import { secondsLeft, StateClockContext, useKickCountdown } from "@/lib/client/kick";
 import type { RoomState } from "@/lib/types";
 import { ErrorText } from "./ui";
 
@@ -13,6 +14,17 @@ interface Props {
   refresh?: () => Promise<void>;
 }
 
+/** "iese în N s" next to a player whose kick is pending (live countdown, refreshes once at 0). */
+function KickBadge({ remainingMs, refresh }: { remainingMs: number; refresh?: () => Promise<void> }) {
+  const receivedAt = useContext(StateClockContext);
+  const left = useKickCountdown(remainingMs, receivedAt, () => void refresh?.()) ?? 0;
+  return (
+    <span className="text-xs font-semibold text-rose-600 dark:text-rose-400" role="status">
+      iese în {secondsLeft(left)} s
+    </span>
+  );
+}
+
 export function PlayerList({ state, mode, token, refresh }: Props) {
   const { players, me, room } = state;
   const canKick = Boolean(token) && room.hostPlayerId === me.id;
@@ -21,7 +33,10 @@ export function PlayerList({ state, mode, token, refresh }: Props) {
 
   async function kick(id: string, nickname: string) {
     if (!token) return;
-    const midGame = room.status === "playing" ? " Dacă e tura lui, tura trece la următorul." : "";
+    const midGame =
+      room.status === "playing"
+        ? " Va avea 10 s să refuze; dacă nu, e scos și, dacă e tura lui, tura trece la următorul."
+        : "";
     if (!window.confirm(`Scoți jucătorul ${nickname} din cameră?${midGame}`)) return;
     setBusy(id);
     setError("");
@@ -74,6 +89,7 @@ export function PlayerList({ state, mode, token, refresh }: Props) {
                 ) : isTurn ? (
                   <span className="text-xs">la tură</span>
                 ) : null}
+                {p.kickRemainingMs !== null && <KickBadge remainingMs={p.kickRemainingMs} refresh={refresh} />}
                 {canKick && p.id !== me.id && (
                   <button
                     type="button"

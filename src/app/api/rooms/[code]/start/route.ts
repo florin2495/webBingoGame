@@ -17,6 +17,10 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/st
     const notReady = players.filter((p) => !p.ready);
     if (notReady.length > 0) fail(409, `Nu sunt toți ready: ${notReady.map((p) => p.nickname).join(", ")}.`);
 
+    // A new game starts clean: no pending kick survives it.
+    const { error: kickError } = await db().from(T.players).update({ kick_requested_at: null }).eq("room_id", room.id);
+    if (kickError) throw kickError;
+
     // Conditional update: only one start can win, and only from the lobby.
     const { data, error } = await db()
       .from(T.rooms)

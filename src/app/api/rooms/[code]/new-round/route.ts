@@ -14,7 +14,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ne
     // Reset ready first: if the room update below fails, players just re-click ready.
     const { error: playersError } = await db()
       .from(T.players)
-      .update({ ready: false, hints_used: 0 })
+      .update({ ready: false, hints_used: 0, kick_requested_at: null })
       .eq("room_id", room.id);
     if (playersError) throw playersError;
 
