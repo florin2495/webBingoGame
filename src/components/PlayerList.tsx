@@ -35,7 +35,7 @@ export function PlayerList({ state, mode, token, refresh }: Props) {
     if (!token) return;
     const midGame =
       room.status === "playing"
-        ? " Va avea 10 s să refuze; dacă nu, e scos și, dacă e tura lui, tura trece la următorul."
+        ? " Are 10 secunde să refuze; dacă nu, e scos și, dacă e tura lui, tura trece la următorul."
         : "";
     if (!window.confirm(`Scoți jucătorul ${nickname} din cameră?${midGame}`)) return;
     setBusy(id);

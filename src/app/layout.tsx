@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   title: "Bingo",
   applicationName: "Bingo",
   appleWebApp: { capable: true, title: "Bingo", statusBarStyle: "default" },
+  other: { "apple-mobile-web-app-capable": "yes" },
   description: "Bingo multiplayer între prieteni, cu matrice N×N personalizabilă.",
 };
 

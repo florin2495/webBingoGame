@@ -1,10 +1,10 @@
 import { ImageResponse } from "next/og";
 
-const BG = "#4f46e5";
+const BG = "#ea580c";
 const NUMS = ["B", "I", "N", "G", "O"];
 
 /**
- * Opaque bingo-card icon: indigo background, white card with a "BINGO" header
+ * Opaque bingo-card icon: orange background, white card with a "BINGO" header
  * and a 3x3 grid of marked cells. `safe` is the fraction of the canvas the
  * artwork occupies (maskable icons need it inside the central 80%).
  */
