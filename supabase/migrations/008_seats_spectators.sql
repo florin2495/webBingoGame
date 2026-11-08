@@ -3,18 +3,26 @@
 --                             with POST /reorder; new-round rotates it so the starter changes every round.
 --  classicbingo_spectators:   people who joined a room that was already running. They see the public state only,
 --                             can queue ("Intră la runda următoare") and become players at the next round.
--- Additive and idempotent. Run once in the Supabase SQL editor BEFORE deploying the code that reads it
+-- Additive and idempotent (safe to run twice). Must be run before the code that reads it is deployed
 -- (PLAYER_COLUMNS selects seat, so every players query fails until then).
 
-alter table public.classicbingo_players add column if not exists seat integer not null default 0;
--- Backfill: join order per room (the old order). Only rows still at the default are touched.
-update public.classicbingo_players p
-   set seat = s.rn
-  from (
-    select id, row_number() over (partition by room_id order by joined_at) - 1 as rn
-      from public.classicbingo_players
-  ) s
- where p.id = s.id and p.seat = 0 and s.rn > 0;
+-- Add the column and backfill join order ONLY the first time (a re-run must not undo a host's reorder).
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'classicbingo_players' and column_name = 'seat'
+  ) then
+    alter table public.classicbingo_players add column seat integer not null default 0;
+    update public.classicbingo_players p
+       set seat = s.rn
+      from (
+        select id, row_number() over (partition by room_id order by joined_at) - 1 as rn
+          from public.classicbingo_players
+      ) s
+     where p.id = s.id;
+  end if;
+end $$;
 
 create table if not exists public.classicbingo_spectators (
   id           uuid primary key default gen_random_uuid(),
