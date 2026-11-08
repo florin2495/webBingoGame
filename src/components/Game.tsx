@@ -244,6 +244,7 @@ export function Game({ state, token, refresh }: Props) {
   function cellState(v: number | null): CellState {
     if (v === null) return "plain";
     if (v === pick) return "selected";
+    if (v === flashed) return "last";
     if (hintOn && marked.has(v) && !calledSet.has(v)) return "wrong";
     if (marked.has(v)) return calledByMe.has(v) ? "mine" : "marked";
     if (hintOn && calledSet.has(v)) return "hint";
@@ -252,14 +253,6 @@ export function Game({ state, token, refresh }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {flashed !== null && (
-        <div aria-live="polite" className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
-          <div className="rounded-3xl border-8 border-orange-500 bg-white px-10 py-6 text-center shadow-2xl dark:bg-zinc-950">
-            <p className="text-xs font-semibold uppercase text-orange-600">Ultimul număr</p>
-            <p className="text-7xl font-black tabular-nums text-orange-600">{flashed}</p>
-          </div>
-        </div>
-      )}
       {room.status === "finished" && dismissedRound !== room.round && (
         <WinnerOverlay
           name={room.winnerPlayerId === me.id ? null : (winnerName ?? "Cineva")}

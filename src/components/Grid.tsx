@@ -8,8 +8,9 @@
  * wrong    - marked but never called (end-of-game reveal, and while "Show" is active)
  * selected - chosen to be called, waiting for confirmation
  * hint     - called but not marked yet, highlighted by the "catch up" helper
+ * last     - the number just called, orange for a moment (setting "Arată ultimul număr strigat")
  */
-export type CellState = "empty" | "plain" | "mine" | "marked" | "wrong" | "selected" | "hint";
+export type CellState = "empty" | "plain" | "mine" | "marked" | "wrong" | "selected" | "hint" | "last";
 
 interface GridProps {
   size: number;
@@ -35,6 +36,7 @@ const styles: Record<CellState, string> = {
   wrong: "bg-rose-200 border-rose-500 text-rose-900 line-through decoration-2 dark:bg-rose-300",
   selected: "bg-amber-300 border-amber-500 text-zinc-900 ring-2 ring-amber-500",
   hint: "bg-white dark:bg-zinc-900 border-yellow-400 ring-4 ring-yellow-400 animate-pulse",
+  last: "bg-orange-400 border-orange-600 text-zinc-900 ring-4 ring-orange-500",
 };
 
 export function Grid({ size, cells, stateOf, onCellClick, disabled, compact = false }: GridProps) {
