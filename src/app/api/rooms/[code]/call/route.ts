@@ -41,6 +41,8 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ca
     if (markError) throw markError;
 
     await notifyRoom(room.id, "number_called");
-    return { ok: true };
+    // Enough for the caller to update its own screen without re-fetching /state.
+    const seq = called.length + 1;
+    return { ok: true, called: { seq, number, playerId: player.id }, nextTurnPlayerId: turnPlayerId(room, seq) };
   });
 }

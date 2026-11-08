@@ -13,6 +13,8 @@ interface Props {
   state: RoomState;
   token: string;
   refresh: () => Promise<void>;
+  /** Applies a change the server just confirmed, without re-fetching /state. */
+  patch: (fn: (s: RoomState) => RoomState) => void;
 }
 
 const LINE_SOUND = withBase("/sounds/line.mp3");
@@ -74,8 +76,11 @@ function useLineSound(enabled: boolean) {
 
 const FLASH_MS = 500;
 
-/** The number to flash on screen for FLASH_MS after a new one is called (null otherwise). Not on first load. */
-function useFlashedNumber(called: CalledNumber[], enabled: boolean): number | null {
+/**
+ * The number to flash (orange border) for FLASH_MS after someone else calls it (null otherwise).
+ * Not on first load, never for my own call (that one goes straight to light green).
+ */
+function useFlashedNumber(called: CalledNumber[], enabled: boolean, meId: string): number | null {
   const [flash, setFlash] = useState<{ seq: number; number: number } | null>(null);
   const lastSeq = useRef<number | null>(null);
   const last = called.length > 0 ? called[called.length - 1] : null;
@@ -84,16 +89,16 @@ function useFlashedNumber(called: CalledNumber[], enabled: boolean): number | nu
     const seq = last?.seq ?? 0;
     const previous = lastSeq.current;
     lastSeq.current = seq;
-    if (!enabled || !last || previous === null || seq <= previous) return;
+    if (!enabled || !last || previous === null || seq <= previous || last.playerId === meId) return;
     setFlash({ seq: last.seq, number: last.number });
     const t = window.setTimeout(() => setFlash((f) => (f?.seq === last.seq ? null : f)), FLASH_MS);
     return () => window.clearTimeout(t);
-  }, [last, enabled]);
+  }, [last, enabled, meId]);
 
   return enabled && flash ? flash.number : null;
 }
 
-export function Game({ state, token, refresh }: Props) {
+export function Game({ state, token, refresh, patch }: Props) {
   const { room, me, players, board, called } = state;
   const base = `/api/rooms/${room.code}`;
   const playing = room.status === "playing";
@@ -105,9 +110,11 @@ export function Game({ state, token, refresh }: Props) {
   const [soundOn] = useBoolPref(PREF_SOUND, true);
   const playLine = useLineSound(soundOn);
   const [showLast] = useBoolPref(PREF_SHOW_LAST, false);
-  const flashed = useFlashedNumber(called, showLast);
+  const flashed = useFlashedNumber(called, showLast, me.id);
 
   const [selected, setSelected] = useState<number | null>(null);
+  // My call in flight: shown light green right away, rolled back if the server refuses it.
+  const [calling, setCalling] = useState<number | null>(null);
   // Optimistic marks not yet confirmed by the server: number -> desired marked state.
   const [pending, setPending] = useState<Map<number, boolean>>(new Map());
   const [busy, setBusy] = useState(false);
@@ -158,7 +165,11 @@ export function Game({ state, token, refresh }: Props) {
     setPending((p) => new Map(p).set(n, want));
     try {
       await api(`${base}/mark`, { token, body: { number: n, marked: want } });
-      await refresh();
+      // Marks are private (no broadcast): the server confirmed it, so update locally, no /state fetch.
+      patch((s) => ({
+        ...s,
+        marks: want ? (s.marks.includes(n) ? s.marks : [...s.marks, n]) : s.marks.filter((m) => m !== n),
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Eroare.");
     } finally {
@@ -183,21 +194,35 @@ export function Game({ state, token, refresh }: Props) {
     }
   }
 
-  function callNumber(n: number) {
+  async function callNumber(n: number) {
     cueIfNewLine(n, true); // the caller's number is marked for them by the server
-    setPending((p) => new Map(p).set(n, true));
-    void act(async () => {
-      try {
-        await api(`${base}/call`, { token, body: { number: n } });
-        setSelected(null);
-      } finally {
-        setPending((p) => {
-          const next = new Map(p);
-          next.delete(n);
-          return next;
-        });
-      }
-    });
+    setCalling(n);
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api<{ called: CalledNumber; nextTurnPlayerId: string | null }>(`${base}/call`, {
+        token,
+        body: { number: n },
+      });
+      setSelected(null);
+      // Apply the call locally; the realtime broadcast refresh reconciles everything else.
+      patch((s) =>
+        s.called.some((c) => c.seq === r.called.seq)
+          ? s // the broadcast refresh already brought it
+          : {
+              ...s,
+              called: [...s.called, r.called],
+              marks: s.marks.includes(n) ? s.marks : [...s.marks, n],
+              room: { ...s.room, currentTurnPlayerId: r.nextTurnPlayerId },
+            },
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Eroare.");
+      void refresh(); // e.g. 409 turn changed: resync
+    } finally {
+      setCalling(null);
+      setBusy(false);
+    }
   }
 
   function onCell(value: number | null) {
@@ -206,7 +231,7 @@ export function Game({ state, token, refresh }: Props) {
     setNotice("");
     if (myTurn && !calledSet.has(value)) {
       if (confirmCall) setSelected(pick === value ? null : value);
-      else callNumber(value);
+      else void callNumber(value);
       return;
     }
     if (calledSet.has(value)) {
@@ -244,9 +269,10 @@ export function Game({ state, token, refresh }: Props) {
   function cellState(v: number | null): CellState {
     if (v === null) return "plain";
     if (v === pick) return "selected";
-    if (v === flashed) return "last";
+    if (v === calling) return "mine";
     if (hintOn && marked.has(v) && !calledSet.has(v)) return "wrong";
     if (marked.has(v)) return calledByMe.has(v) ? "mine" : "marked";
+    if (v === flashed) return "last";
     if (hintOn && calledSet.has(v)) return "hint";
     return "plain";
   }
@@ -315,7 +341,7 @@ export function Game({ state, token, refresh }: Props) {
         {playing && board && (
           <div className="mt-3 flex flex-col gap-2">
             {myTurn && confirmCall && (
-              <Button onClick={() => pick !== null && callNumber(pick)} disabled={busy || pick === null}>
+              <Button onClick={() => pick !== null && void callNumber(pick)} disabled={busy || pick === null}>
                 {pick === null ? "Alege un număr" : `Strigă ${pick}`}
               </Button>
             )}
