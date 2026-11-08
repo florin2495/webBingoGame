@@ -5,7 +5,7 @@ import { isUniqueViolation } from "./http";
 const GAME = "bingo";
 
 /** Contract C: player_key = nickname, trimmed and lowercased (no accounts: same nickname = same person). */
-export const playerKey = (nickname: string) => nickname.trim().toLowerCase();
+export const playerKey = (nickname: string) => nickname.trim().toLowerCase().slice(0, 40);
 
 /**
  * Reports a finished round to the hub leaderboard (hub_leaderboard, hub_leaderboard_rounds, owned by the hub):
@@ -45,7 +45,7 @@ export async function reportRound(room: RoomRow, participantIds: string[], winne
       return {
         game: GAME,
         player_key: key,
-        display_name: p.nickname,
+        display_name: p.nickname.trim().slice(0, 40),
         wins: (row?.wins ?? 0) + (winners.has(p.id) ? 1 : 0),
         games: (row?.games ?? 0) + 1,
         updated_at: now,
