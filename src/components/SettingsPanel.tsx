@@ -1,6 +1,6 @@
 "use client";
 
-import { PREF_CONFIRM_CALL, PREF_SOUND, useBoolPref } from "@/lib/client/prefs";
+import { PREF_CONFIRM_CALL, PREF_SHOW_LAST, PREF_SOUND, useBoolPref } from "@/lib/client/prefs";
 import { Card, Toggle } from "./ui";
 
 const VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
@@ -9,6 +9,7 @@ const VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 export function SettingsPanel() {
   const [confirmCall, setConfirmCall] = useBoolPref(PREF_CONFIRM_CALL, false);
   const [soundOn, setSoundOn] = useBoolPref(PREF_SOUND, true);
+  const [showLast, setShowLast] = useBoolPref(PREF_SHOW_LAST, false);
 
   return (
     <Card className="py-2">
@@ -32,6 +33,12 @@ export function SettingsPanel() {
             hint="Pornește doar când linia e cu adevărat validă (toate numerele bifate au fost strigate)."
             checked={soundOn}
             onChange={setSoundOn}
+          />
+          <Toggle
+            label="Arată ultimul număr strigat"
+            hint="Numărul apare scurt pe ecran, într-un chenar portocaliu."
+            checked={showLast}
+            onChange={setShowLast}
           />
         </div>
       </details>

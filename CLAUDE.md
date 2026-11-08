@@ -25,6 +25,9 @@ so this list is the source of truth. **Update it whenever the user confirms a mi
 | `supabase/migrations/004_classicbingo_prefix.sql` | yes (2026-11-06, verified) | renames all tables/constraints/indexes to `classicbingo_*`; breaks code < 1.2.3, deploy 1.2.3 right after |
 | `supabase/migrations/005_pending_kick.sql` | yes (2026-11-07, verified) | `classicbingo_players.kick_requested_at` (pending kick with 10 s "Ignoră"); run BEFORE deploying the code that reads it - until then every players query (and local dev, same DB) fails |
 | `supabase/migrations/006_reconnect.sql` | yes (2026-11-07, verified: service role 200, anon 401) | `classicbingo_players.last_seen_at`, `device_hash` + index (rejoin the same seat). Run BEFORE deploying the code that reads it - `PLAYER_COLUMNS` selects `last_seen_at`, so every players query fails until then |
+| `supabase/migrations/007_shows_by_size.sql` | **NO - to run** | `hints_used` check 0..25 ("Show" count by size: 5, 8x8 15, 9x9 20, 10x10 25). Run BEFORE deploying: an 8x8+ room hits the old check on its 6th Show |
+| `supabase/migrations/008_seats_spectators.sql` | **NO - to run** | `classicbingo_players.seat` (host-chosen order, rotated each round) + `classicbingo_spectators` table. Run BEFORE deploying: `PLAYER_COLUMNS` selects `seat`, so every players query (and local dev, same DB) fails until then |
+| hub `hub_leaderboard`, `hub_leaderboard_rounds` | owned by the hub repo (`000_Startup` migration 002) - **to run there** | Bingo only writes to them (`src/lib/server/leaderboard.ts`, best effort: if the tables are missing it logs and the game goes on). Do not deploy the reporting code before the hub migration ran |
 
 Rules for schema changes:
 - The Supabase project is shared by all hub mini-games: every object of this game is prefixed `classicbingo_`
@@ -41,6 +44,18 @@ Rules for schema changes:
   (`device_hash`, from the browser's `bingo:device` id) or once the seat has been unseen for 45 s, also mid-game.
   `/state` exposes only a derived `connected` flag ("deconectat" badge); never select `token_hash`/`device_hash`
   into `PLAYER_COLUMNS`.
+
+## Seats, spectators, leaderboard (feedback 2026-11-08, shared contracts in `D:\_DEv\FEEDBACK_PLAN.md`)
+- Play order = `classicbingo_players.seat` (lowest first = first caller). Host reorders in the lobby with `POST /reorder { order }`
+  (full permutation, lobby only); `new-round` rotates the seats one step so the starter changes every round.
+- Joining a room that is `playing`/`finished` makes you a spectator (`classicbingo_spectators`, max 16, public state only,
+  `role: "spectator"` in `/state`, every player route answers 403 via `requireMember`; `requireViewer` lets spectators through for
+  `/state`, `/leave`, `/queue`). `POST /queue` toggles "Intră la runda următoare"; `new-round` (or `/queue` while the room is already in
+  the lobby) promotes queued spectators in queue order while there are seats (`promoteQueued`: same id and token, so the session stays valid).
+  Rejoin works for spectators too (`join` with the same nickname reclaims the spectator row).
+- Called numbers can never be un-ticked (`/mark` answers 409 for `marked: false` on a called number; the client ignores the tap).
+- "Show" count = `hintsPerRound(size)` in `game.ts` (5; 8x8 15, 9x9 20, 10x10 25).
+- `reportRound` (validate win, or last player wins after leaves) writes `hub_leaderboard` (player_key = lowercased nickname).
 
 ## Testing
 - `npm test` (Vitest, pure rules in `src/lib/game.ts`), `npx tsc --noEmit`, `npx eslint src`, `npx next build`.

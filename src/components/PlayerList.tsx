@@ -41,6 +41,27 @@ export function PlayerList({ state, mode, token, refresh }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  const canReorder = canKick && mode === "lobby" && players.length > 1;
+
+  /** Host moves a player one place up (-1) or down (+1): saves the full new order. */
+  async function move(index: number, dir: -1 | 1) {
+    if (!token) return;
+    const target = index + dir;
+    if (target < 0 || target >= players.length) return;
+    const order = players.map((p) => p.id);
+    [order[index], order[target]] = [order[target], order[index]];
+    setBusy(order[target]);
+    setError("");
+    try {
+      await api(`/api/rooms/${room.code}/reorder`, { token, body: { order } });
+      await refresh?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Eroare.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function kick(id: string, nickname: string) {
     if (!token) return;
     const midGame =
@@ -63,7 +84,7 @@ export function PlayerList({ state, mode, token, refresh }: Props) {
   return (
     <>
       <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
-        {players.map((p) => {
+        {players.map((p, index) => {
           const isTurn = mode === "game" && room.currentTurnPlayerId === p.id;
           const isWinner = room.winnerPlayerId === p.id;
           return (
@@ -72,6 +93,7 @@ export function PlayerList({ state, mode, token, refresh }: Props) {
               className={`flex items-center justify-between gap-2 py-2 ${isTurn ? "font-bold text-indigo-600 dark:text-indigo-400" : ""}`}
             >
               <span className="flex min-w-0 items-center gap-2">
+                {mode === "lobby" && <span className="w-4 text-right text-xs tabular-nums text-zinc-500">{index + 1}.</span>}
                 {mode === "game" && (
                   <span aria-hidden className="w-3 text-center">
                     {isTurn ? "▶" : ""}
@@ -100,6 +122,22 @@ export function PlayerList({ state, mode, token, refresh }: Props) {
                 ) : isTurn ? (
                   <span className="text-xs">la tură</span>
                 ) : null}
+                {canReorder && (
+                  <span className="flex gap-1">
+                    {([-1, 1] as const).map((dir) => (
+                      <button
+                        key={dir}
+                        type="button"
+                        onClick={() => void move(index, dir)}
+                        disabled={busy !== null || index + dir < 0 || index + dir >= players.length}
+                        className="min-h-8 min-w-8 rounded-md border border-zinc-300 text-sm font-semibold disabled:opacity-30 dark:border-zinc-700"
+                        aria-label={`${dir === -1 ? "Mută în sus" : "Mută în jos"} pe ${p.nickname}`}
+                      >
+                        {dir === -1 ? "▲" : "▼"}
+                      </button>
+                    ))}
+                  </span>
+                )}
                 {p.kickRemainingMs !== null && <KickBadge remainingMs={p.kickRemainingMs} refresh={refresh} />}
                 {canKick && p.id !== me.id && (
                   <button

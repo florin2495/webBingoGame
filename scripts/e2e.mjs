@@ -145,7 +145,39 @@ async function main() {
   check((await call(`/api/rooms/${code}/start`, { token: B.token, body: {} })).status === 403, "non-host start = 403");
   check((await call(`/api/rooms/${code}/start`, { token: A.token, body: {} })).status === 200, "host starts");
   check((await call(`/api/rooms/${code}/start`, { token: A.token, body: {} })).status === 409, "double start = 409");
-  check((await call(`/api/rooms/${code}/join`, { body: { nickname: "Dan", password: "pw" } })).status === 409, "new player mid-game = 409");
+  check((await call(`/api/rooms/${code}/reorder`, { token: A.token, body: { order: [A.playerId, B.playerId, C.playerId] } })).status === 409, "reorder mid-game = 409");
+
+  console.log("Spectators");
+  const devE = randomUUID();
+  const devD = randomUUID();
+  const joinRes = (nickname, deviceId) => call(`/api/rooms/${code}/join`, { body: { nickname, password: "pw", deviceId } });
+  const dRes = await joinRes("Dan", devD);
+  check(dRes.status === 200 && dRes.data.role === "spectator", "joining a running room = spectator");
+  const D = { ...dRes.data, name: "Dan" };
+  const eRes = await joinRes("Eli", devE);
+  const E = { ...eRes.data, name: "Eli" };
+  check(eRes.status === 200 && E.role === "spectator", "second spectator");
+  check((await joinRes("dan", randomUUID())).status === 409, "nickname of a connected spectator from another device = 409");
+  const sD = await state(code, D);
+  check(sD.role === "spectator" && sD.board === null && sD.marks.length === 0 && sD.hintsLeft === 0 && sD.reveal === null, "spectator state: no board, no marks, no reveal");
+  check(sD.spectators.map((x) => x.nickname).join() === "Dan,Eli" && sD.players.length === 3 && sD.me.id === D.playerId, "spectator sees players and spectators");
+  const rawD = JSON.stringify(sD);
+  check(![A, B, C].some((o) => rawD.includes(o.token)) && !rawD.includes("token_hash") && !rawD.includes("device_hash"), "spectator state leaks no tokens or hashes");
+  check((await state(code, A)).spectators.length === 2 && (await state(code, A)).role === "player", "players see the spectators too");
+  for (const [path, body] of [["call", { number: 9 }], ["mark", { number: 9, marked: true }], ["hint", {}], ["validate", {}], ["skip", {}], ["ready", {}], ["start", {}], ["new-round", {}], ["kick", { playerId: A.playerId }], ["reorder", { order: [] }], ["board", { generate: true }], ["settings", { size: 5 }]]) {
+    const res = await call(`/api/rooms/${code}/${path}`, { token: D.token, body });
+    check(res.status === 403, `spectator ${path} = 403 (${res.status})`);
+  }
+  check((await call(`/api/rooms/${code}/queue`, { token: A.token, body: {} })).status === 409, "a player cannot queue");
+  check((await call(`/api/rooms/${code}/queue`, { token: D.token, body: {} })).data.queued === true, "Dan queues for the next round");
+  check((await call(`/api/rooms/${code}/queue`, { token: D.token, body: {} })).data.queued === false, "queue is a toggle (Dan out)");
+  check((await call(`/api/rooms/${code}/queue`, { token: E.token, body: {} })).data.queued === true, "Eli queues first");
+  check((await call(`/api/rooms/${code}/queue`, { token: D.token, body: {} })).data.queued === true, "Dan queues second");
+  check((await state(code, D)).spectators.map((x) => x.nickname).join() === "Eli,Dan", "queue order: Eli, Dan");
+  const D2 = await joinRes("Dan", devD);
+  check(D2.data.playerId === D.playerId && D2.data.role === "spectator" && D2.data.token !== D.token, "spectator rejoins from the same device = same id, new token");
+  D.token = D2.data.token;
+  check((await call(`/api/rooms/${code}/state`, { token: D2.data.token })).data.queued === true, "queue survives the rejoin");
   check((await call(`/api/rooms/${code}/settings`, { token: A.token, body: { size: 5 } })).status === 409, "settings mid-game = 409");
 
   const players = { [A.playerId]: A, [B.playerId]: B, [C.playerId]: C };
@@ -189,6 +221,9 @@ async function main() {
   check((await state(code, C)).marks.length === 0, "unmark works");
   // Bob's marks are private: Ana's state does not change.
   await call(`/api/rooms/${code}/mark`, { token: B.token, body: { number: 1, marked: true } });
+  const unmark = await call(`/api/rooms/${code}/mark`, { token: B.token, body: { number: 1, marked: false } });
+  check(unmark.status === 409, `a called number cannot be un-ticked (${unmark.status})`);
+  check((await call(`/api/rooms/${code}/mark`, { token: A.token, body: { number: 1, marked: false } })).status === 409, "not even by the one who called it");
   check((await state(code, A)).marks.join() === "1" && (await state(code, B)).marks.join() === "1", "marks are per player");
 
   console.log("Hint, kick with Ignoră, skip, rejoin mid-game");
@@ -211,6 +246,8 @@ async function main() {
 
   console.log("Play to the end");
   let s = await state(code, A);
+  // Everyone catches up on the numbers called so far (Cris never ticked the first one).
+  for (const q of [A, B, C]) for (const c of s.called) await call(`/api/rooms/${code}/mark`, { token: q.token, body: { number: c.number, marked: true } });
   let winner = null;
   let guard = 0;
   while (s.room.status === "playing" && guard++ < 20) {
@@ -236,7 +273,7 @@ async function main() {
           winner = q;
           break;
         }
-        check(v.status === 409, `late validation rejected (${v.status})`);
+        check(v.status === 409, `late validation rejected (${v.status} ${JSON.stringify(v.data)})`);
       }
     }
     s = await state(code, A);
@@ -256,6 +293,16 @@ async function main() {
   check((await call(`/api/rooms/${code}/new-round`, { token: A.token, body: {} })).status === 409, "double new round = 409");
   s = await state(code, B);
   check(s.room.status === "lobby" && s.room.round === 2 && s.board === null && s.called.length === 0 && s.hintsLeft === 5 && s.players.every((p) => !p.ready), "round 2: clean lobby");
+  check(s.players.map((p) => p.nickname).join() === "Bob,Cris,Ana,Eli,Dan", `seats rotated, queued spectators joined in queue order (${s.players.map((p) => p.nickname).join()})`);
+  check(s.spectators.length === 0, "queue emptied");
+  check((await state(code, D)).role === "player" && (await call(`/api/rooms/${code}/state`, { token: E.token })).data.role === "player", "spectator tokens still work, now as players");
+  for (const q of [D, E]) check((await call(`/api/rooms/${code}/leave`, { token: q.token, body: {} })).status === 200, `${q.name} leaves the lobby`);
+  check((await call(`/api/rooms/${code}/reorder`, { token: B.token, body: { order: [] } })).status === 403, "non-host reorder = 403");
+  check((await call(`/api/rooms/${code}/reorder`, { token: A.token, body: { order: [A.playerId, B.playerId] } })).status === 409, "reorder with a missing player = 409");
+  check((await call(`/api/rooms/${code}/reorder`, { token: A.token, body: { order: [A.playerId, A.playerId, B.playerId] } })).status === 409, "reorder with a duplicate = 409");
+  check((await call(`/api/rooms/${code}/reorder`, { token: A.token, body: { order: [B.playerId, A.playerId, C.playerId] } })).status === 200, "host reorders: Bob, Ana, Cris");
+  s = await state(code, C);
+  check(s.players.map((p) => p.nickname).join() === "Bob,Ana,Cris", "everyone sees the new order");
 
   // Round 2: 3 players, pending kick enforced after 12 s, then Bob leaves -> Ana wins alone.
   for (const p of [A, B, C]) {
@@ -276,13 +323,13 @@ async function main() {
 
   // Lobby kick is immediate.
   await call(`/api/rooms/${code}/new-round`, { token: A.token, body: {} });
-  const D = await join("Dan", randomUUID());
-  check(!!D.token, "Dan joins the lobby");
+  const F = await join("Fay", randomUUID());
+  check(!!F.token, "Fay joins the lobby");
   check((await call(`/api/rooms/${code}/kick`, { token: A.token, body: { playerId: A.playerId } })).status === 400, "host cannot kick himself");
   check((await call(`/api/rooms/${code}/kick`, { token: A.token, body: { playerId: "not-a-uuid" } })).status === 404, "kick unknown id = 404");
-  const k = await call(`/api/rooms/${code}/kick`, { token: A.token, body: { playerId: D.playerId } });
+  const k = await call(`/api/rooms/${code}/kick`, { token: A.token, body: { playerId: F.playerId } });
   check(k.status === 200 && !k.data.pending, "lobby kick is immediate");
-  check((await call(`/api/rooms/${code}/state`, { token: D.token })).status === 401, "kicked player = 401");
+  check((await call(`/api/rooms/${code}/state`, { token: F.token })).status === 401, "kicked player = 401");
 
   console.log("Cleanup");
   const last = await call(`/api/rooms/${code}/leave`, { token: A.token, body: {} });

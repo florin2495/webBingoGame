@@ -24,6 +24,7 @@ import { Game } from "./Game";
 import { KickModal } from "./KickModal";
 import { Lobby } from "./Lobby";
 import { SettingsPanel } from "./SettingsPanel";
+import { SpectatorList, SpectatorView } from "./Spectator";
 import { Button, Card, ErrorText, Field } from "./ui";
 
 const POLL_MS = 15_000;
@@ -177,11 +178,14 @@ function Room({ code, token }: { code: string; token: string }) {
     <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 py-4">
       <RoomHeader state={state} />
       {error && <ErrorText>Conexiune instabilă: {error}</ErrorText>}
-      {state.room.status === "lobby" ? (
+      {state.role === "spectator" ? (
+        <SpectatorView state={state} token={token} refresh={refresh} />
+      ) : state.room.status === "lobby" ? (
         <Lobby state={state} token={token} refresh={refresh} />
       ) : (
         <Game state={state} token={token} refresh={refresh} />
       )}
+      {state.role === "player" && <SpectatorList spectators={state.spectators} meId={state.me.id} />}
       <SettingsPanel />
       <LeaveButton state={state} token={token} />
       {state.me.kickRemainingMs !== null && (
@@ -198,10 +202,13 @@ function LeaveButton({ state, token }: { state: RoomState; token: string }) {
   const [error, setError] = useState("");
   const { room, me, players } = state;
   const isHost = room.hostPlayerId === me.id;
-  const alone = players.length <= 1;
+  const spectator = state.role === "spectator";
+  const alone = !spectator && players.length <= 1;
 
   async function leave() {
-    const warning = alone
+    const warning = spectator
+      ? "Nu mai urmărești camera. Continui?"
+      : alone
       ? "Ești singur în cameră. Dacă pleci, camera se închide. Continui?"
       : room.status === "playing"
         ? "Părăsești jocul în desfășurare. Nu mai poți reveni în runda asta. Continui?"
@@ -228,7 +235,7 @@ function LeaveButton({ state, token }: { state: RoomState; token: string }) {
   return (
     <div className="pb-6 pt-2 text-center">
       <Button variant="danger" className="w-full" onClick={() => void leave()} disabled={busy}>
-        {busy ? "Se iese…" : room.status === "playing" ? "Părăsește jocul" : "Părăsește camera"}
+        {busy ? "Se iese…" : room.status === "playing" && !spectator ? "Părăsește jocul" : "Părăsește camera"}
       </Button>
       <div className="mt-2">
         <ErrorText>{error}</ErrorText>

@@ -1,10 +1,10 @@
-import { MIN_PLAYERS_TO_START, roundTurnOrder } from "@/lib/game";
+import { MIN_PLAYERS_TO_START } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
 import { db, T } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
 import { listPlayers, requireHost, requireMember, requireStatus } from "@/lib/server/room";
 
-// POST /api/rooms/[code]/start - host only, every player ready. Fixes the turn order.
+// POST /api/rooms/[code]/start - host only, every player ready. Fixes the turn order (= seat order).
 export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/start">) {
   return handle(async () => {
     const { code } = await ctx.params;
@@ -26,12 +26,9 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/st
       .from(T.rooms)
       .update({
         status: "playing",
-        // Round 1: host first, then join order. Each later round the first caller rotates by one.
-        turn_order: roundTurnOrder(
-          players.map((p) => p.id),
-          room.host_player_id,
-          room.round,
-        ),
+        // Seat order (listPlayers sorts by seat): the first one calls first. The host sits at seat 0 in round 1 and
+        // can reorder in the lobby; new-round rotates the seats so the starter changes every round.
+        turn_order: players.map((p) => p.id),
         turn_offset: 0,
         winner_player_id: null,
         updated_at: new Date().toISOString(),

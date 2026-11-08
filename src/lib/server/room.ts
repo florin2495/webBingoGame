@@ -1,10 +1,10 @@
 import "server-only";
-import { currentTurnIndex, HINTS_PER_ROUND, isRoomExpired, minutesLabel, ROOM_IDLE_MINUTES } from "@/lib/game";
+import { currentTurnIndex, hintsPerRound, isRoomExpired, minutesLabel, ROOM_IDLE_MINUTES } from "@/lib/game";
 import { kickRemainingMs } from "@/lib/kick";
 import { isConnected, LAST_SEEN_TOUCH_MS } from "@/lib/reconnect";
-import type { CalledNumber, PublicPlayer, RevealedBoard, RoomState } from "@/lib/types";
+import type { CalledNumber, PublicPlayer, PublicSpectator, RevealedBoard, RoomState } from "@/lib/types";
 import { hashToken } from "./crypto";
-import { db, PLAYER_COLUMNS, type PlayerRow, type RoomRow, T } from "./db";
+import { db, PLAYER_COLUMNS, SPECTATOR_COLUMNS, type PlayerRow, type RoomRow, type SpectatorRow, T } from "./db";
 import { fail } from "./http";
 import { enforceExpiredKicks } from "./kicks";
 
@@ -50,28 +50,54 @@ export async function touchRoom(roomId: string): Promise<void> {
  * Every member-only route goes through here.
  */
 export async function requireMember(req: Request, code: string): Promise<{ room: RoomRow; player: PlayerRow }> {
-  const token = req.headers.get("x-player-token");
-  if (!token || token.length > 200) fail(401, "Nu ești în această cameră.");
-  const room = await enforceExpiredKicks(await getRoomByCode(code), code);
-  const { data, error } = await db()
-    .from(T.players)
-    .select(PLAYER_COLUMNS)
-    .eq("token_hash", hashToken(token))
-    .eq("room_id", room.id)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) fail(401, "Nu ești în această cameră.");
-  const player = data as PlayerRow;
-  await touchPlayer(player);
+  const { room, player } = await requireViewer(req, code);
+  if (!player) fail(403, "Ești spectator: nu poți face asta. Intră la runda următoare ca să joci.");
   return { room, player };
 }
 
+/**
+ * Like requireMember, but also lets spectators through (state, leave, queue). Exactly one of
+ * `player` / `spectator` is set.
+ */
+export async function requireViewer(
+  req: Request,
+  code: string,
+): Promise<{ room: RoomRow; player: PlayerRow | null; spectator: SpectatorRow | null }> {
+  const token = req.headers.get("x-player-token");
+  if (!token || token.length > 200) fail(401, "Nu ești în această cameră.");
+  const room = await enforceExpiredKicks(await getRoomByCode(code), code);
+  const tokenHash = hashToken(token);
+  const { data, error } = await db()
+    .from(T.players)
+    .select(PLAYER_COLUMNS)
+    .eq("token_hash", tokenHash)
+    .eq("room_id", room.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (data) {
+    const player = data as PlayerRow;
+    await touchSeen(T.players, player);
+    return { room, player, spectator: null };
+  }
+  const { data: spec, error: specError } = await db()
+    .from(T.spectators)
+    .select(SPECTATOR_COLUMNS)
+    .eq("token_hash", tokenHash)
+    .eq("room_id", room.id)
+    .maybeSingle();
+  if (specError) throw specError;
+  if (!spec) fail(401, "Nu ești în această cameră.");
+  const spectator = spec as SpectatorRow;
+  await touchSeen(T.spectators, spectator);
+  return { room, player: null, spectator };
+}
+
 /** Presence heartbeat: stamps last_seen_at at most every LAST_SEEN_TOUCH_MS. Best effort, never throws. */
-async function touchPlayer(player: PlayerRow): Promise<void> {
+async function touchSeen(table: string, row: { id: string; last_seen_at: string }): Promise<void> {
   const now = Date.now();
-  if (now - Date.parse(player.last_seen_at) < LAST_SEEN_TOUCH_MS) return;
-  player.last_seen_at = new Date(now).toISOString();
-  const { error } = await db().from(T.players).update({ last_seen_at: player.last_seen_at }).eq("id", player.id);
+  if (now - Date.parse(row.last_seen_at) < LAST_SEEN_TOUCH_MS) return;
+  row.last_seen_at = new Date(now).toISOString();
+  const { error } = await db().from(table).update({ last_seen_at: row.last_seen_at }).eq("id", row.id);
   if (error) console.error("presence touch failed", error);
 }
 
@@ -95,9 +121,19 @@ export async function listPlayers(roomId: string): Promise<PlayerRow[]> {
     .from(T.players)
     .select(PLAYER_COLUMNS)
     .eq("room_id", roomId)
+    .order("seat", { ascending: true })
     .order("joined_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as PlayerRow[];
+}
+
+/** Spectators, queued ones first (in queue order), then the rest by arrival. */
+export async function listSpectators(roomId: string): Promise<SpectatorRow[]> {
+  const { data, error } = await db().from(T.spectators).select(SPECTATOR_COLUMNS).eq("room_id", roomId);
+  if (error) throw error;
+  const rows = (data ?? []) as SpectatorRow[];
+  const at = (r: SpectatorRow) => Date.parse(r.queued_at ?? r.joined_at);
+  return rows.sort((a, b) => Number(b.queued_at !== null) - Number(a.queued_at !== null) || at(a) - at(b));
 }
 
 export async function listCalled(roomId: string, round: number): Promise<CalledNumber[]> {
@@ -157,13 +193,27 @@ async function revealRound(roomId: string, round: number): Promise<RevealedBoard
   }));
 }
 
-export async function buildState(room: RoomRow, me: PlayerRow): Promise<RoomState> {
+const toPublicSpectator = (s: SpectatorRow, now: number): PublicSpectator => ({
+  id: s.id,
+  nickname: s.nickname,
+  queued: s.queued_at !== null,
+  connected: isConnected(s.last_seen_at, now),
+});
+
+/**
+ * State for a viewer. A spectator gets the public part only: no board, no marks, no hints; the reveal of all
+ * boards exists only once the round is finished (the same moment the players get it).
+ */
+export async function buildState(room: RoomRow, viewer: PlayerRow | SpectatorRow): Promise<RoomState> {
   const now = Date.now();
-  const [players, called, board, marks, reveal] = await Promise.all([
+  const me = "seat" in viewer ? viewer : null;
+  const spec = "seat" in viewer ? null : viewer;
+  const [players, spectators, called, board, marks, reveal] = await Promise.all([
     listPlayers(room.id),
+    listSpectators(room.id),
     listCalled(room.id, room.round),
-    getBoard(me.id, room.round),
-    getMarks(me.id, room.round),
+    me ? getBoard(me.id, room.round) : Promise.resolve(null),
+    me ? getMarks(me.id, room.round) : Promise.resolve([] as number[]),
     room.status === "finished" ? revealRound(room.id, room.round) : Promise.resolve(null),
   ]);
 
@@ -188,11 +238,16 @@ export async function buildState(room: RoomRow, me: PlayerRow): Promise<RoomStat
       currentTurnPlayerId: turnPlayerId(room, called.length),
     },
     players: ordered.map((p) => toPublic(p, now)),
-    me: toPublic(me, now),
+    spectators: spectators.map((s) => toPublicSpectator(s, now)),
+    role: me ? "player" : "spectator",
+    queued: spec ? spec.queued_at !== null : false,
+    me: me
+      ? toPublic(me, now)
+      : { id: viewer.id, nickname: viewer.nickname, isHost: false, ready: false, kickRemainingMs: null, connected: true },
     board,
     marks,
     called,
-    hintsLeft: Math.max(0, HINTS_PER_ROUND - (me.hints_used ?? 0)),
+    hintsLeft: me ? Math.max(0, hintsPerRound(room.size) - (me.hints_used ?? 0)) : 0,
     reveal,
   };
 }

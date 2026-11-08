@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, withBase } from "@/lib/client/api";
-import { PREF_CONFIRM_CALL, PREF_SOUND, useBoolPref } from "@/lib/client/prefs";
-import { countValidLines, HINT_HIGHLIGHT_MS, HINTS_PER_ROUND } from "@/lib/game";
-import type { RoomState } from "@/lib/types";
+import { PREF_CONFIRM_CALL, PREF_SHOW_LAST, PREF_SOUND, useBoolPref } from "@/lib/client/prefs";
+import { countValidLines, HINT_HIGHLIGHT_MS, hintsPerRound } from "@/lib/game";
+import type { CalledNumber, RoomState } from "@/lib/types";
 import { Grid, type CellState } from "./Grid";
 import { OfflineBadge, PlayerList } from "./PlayerList";
 import { Button, Card, ErrorText } from "./ui";
@@ -72,6 +72,27 @@ function useLineSound(enabled: boolean) {
   }, [enabled]);
 }
 
+const FLASH_MS = 500;
+
+/** The number to flash on screen for FLASH_MS after a new one is called (null otherwise). Not on first load. */
+function useFlashedNumber(called: CalledNumber[], enabled: boolean): number | null {
+  const [flash, setFlash] = useState<{ seq: number; number: number } | null>(null);
+  const lastSeq = useRef<number | null>(null);
+  const last = called.length > 0 ? called[called.length - 1] : null;
+
+  useEffect(() => {
+    const seq = last?.seq ?? 0;
+    const previous = lastSeq.current;
+    lastSeq.current = seq;
+    if (!enabled || !last || previous === null || seq <= previous) return;
+    setFlash({ seq: last.seq, number: last.number });
+    const t = window.setTimeout(() => setFlash((f) => (f?.seq === last.seq ? null : f)), FLASH_MS);
+    return () => window.clearTimeout(t);
+  }, [last, enabled]);
+
+  return enabled && flash ? flash.number : null;
+}
+
 export function Game({ state, token, refresh }: Props) {
   const { room, me, players, board, called } = state;
   const base = `/api/rooms/${room.code}`;
@@ -83,6 +104,8 @@ export function Game({ state, token, refresh }: Props) {
   const [confirmCall] = useBoolPref(PREF_CONFIRM_CALL, false);
   const [soundOn] = useBoolPref(PREF_SOUND, true);
   const playLine = useLineSound(soundOn);
+  const [showLast] = useBoolPref(PREF_SHOW_LAST, false);
+  const flashed = useFlashedNumber(called, showLast);
 
   const [selected, setSelected] = useState<number | null>(null);
   // Optimistic marks not yet confirmed by the server: number -> desired marked state.
@@ -186,6 +209,11 @@ export function Game({ state, token, refresh }: Props) {
       else callNumber(value);
       return;
     }
+    if (calledSet.has(value)) {
+      // A called number can only be ticked, never un-ticked (the server enforces it too).
+      if (!marked.has(value)) void toggleMark(value);
+      return;
+    }
     void toggleMark(value);
   }
 
@@ -224,6 +252,14 @@ export function Game({ state, token, refresh }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {flashed !== null && (
+        <div aria-live="polite" className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+          <div className="rounded-3xl border-8 border-orange-500 bg-white px-10 py-6 text-center shadow-2xl dark:bg-zinc-950">
+            <p className="text-xs font-semibold uppercase text-orange-600">Ultimul număr</p>
+            <p className="text-7xl font-black tabular-nums text-orange-600">{flashed}</p>
+          </div>
+        </div>
+      )}
       {room.status === "finished" && dismissedRound !== room.round && (
         <WinnerOverlay
           name={room.winnerPlayerId === me.id ? null : (winnerName ?? "Cineva")}
@@ -298,7 +334,7 @@ export function Game({ state, token, refresh }: Props) {
                 disabled={busy || (!hintOn && state.hintsLeft === 0)}
                 title={`Timp de ${HINT_HIGHLIGHT_MS / 1000} secunde: galben = strigate dar nebifate, roșu = bifate dar nestrigate.`}
               >
-                Show {state.hintsLeft}/{HINTS_PER_ROUND}
+                Show {state.hintsLeft}/{hintsPerRound(room.size)}
               </Button>
               <Button variant="secondary" className="flex-1 basis-0" onClick={() => void validate()} disabled={busy}>
                 Validează ({room.linesToWin} {room.linesToWin === 1 ? "linie" : "linii"})
@@ -390,7 +426,7 @@ export function Game({ state, token, refresh }: Props) {
 }
 
 /** End of game: everyone else's card with their marks, expandable under their name. */
-function RevealedBoards({ state }: { state: RoomState }) {
+export function RevealedBoards({ state }: { state: RoomState }) {
   const { room, players, called, me } = state;
   const calledSet = new Set(called.map((c) => c.number));
   const callerOf = new Map(called.map((c) => [c.number, c.playerId]));

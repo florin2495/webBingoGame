@@ -11,6 +11,7 @@ export const T = {
   boards: "classicbingo_boards",
   calledNumbers: "classicbingo_called_numbers",
   marks: "classicbingo_marks",
+  spectators: "classicbingo_spectators",
 } as const;
 
 let admin: SupabaseClient | null = null;
@@ -56,7 +57,20 @@ export interface PlayerRow {
   joined_at: string;
   /** Presence stamp, touched by requireMember. Needs migration 006_reconnect.sql. */
   last_seen_at: string;
+  /** Play order, lowest first (migration 008). */
+  seat: number;
+}
+
+/** A viewer of a room that was already running (migration 008). */
+export interface SpectatorRow {
+  id: string;
+  room_id: string;
+  nickname: string;
+  queued_at: string | null;
+  joined_at: string;
+  last_seen_at: string;
 }
 
 /** Never add token_hash / device_hash here: these rows feed the public state. */
-export const PLAYER_COLUMNS = "id, room_id, nickname, is_host, ready, hints_used, kick_requested_at, joined_at, last_seen_at";
+export const PLAYER_COLUMNS = "id, room_id, nickname, is_host, ready, hints_used, kick_requested_at, joined_at, last_seen_at, seat";
+export const SPECTATOR_COLUMNS = "id, room_id, nickname, queued_at, joined_at, last_seen_at";

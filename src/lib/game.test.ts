@@ -5,11 +5,15 @@ import {
   isRoomExpired,
   minutesLabel,
   ROOM_IDLE_MINUTES,
-  roundTurnOrder,
+  rotateSeats,
+  isPermutationOf,
+  promotable,
   turnAfterLeave,
   countValidLines,
   currentTurnIndex,
   generateBoard,
+  HINTS_MAX,
+  hintsPerRound,
   isValidBoard,
   isValidLinesToWin,
   isValidSize,
@@ -87,18 +91,26 @@ describe("turns", () => {
   });
 });
 
-describe("round turn order", () => {
-  const ids = ["host", "b", "c"];
-  it("round 1 starts with the host, then join order", () => {
-    expect(roundTurnOrder(ids, "host", 1)).toEqual(["host", "b", "c"]);
+describe("seats", () => {
+  it("rotateSeats moves the first player to the end, so the starter changes every round", () => {
+    expect(rotateSeats(["a", "b", "c"])).toEqual(["b", "c", "a"]);
+    expect(rotateSeats(rotateSeats(rotateSeats(["a", "b", "c"])))).toEqual(["a", "b", "c"]);
+    expect(rotateSeats(["a"])).toEqual(["a"]);
+    expect(rotateSeats([])).toEqual([]);
   });
-  it("rotates the first caller every round", () => {
-    expect(roundTurnOrder(ids, "host", 2)).toEqual(["b", "c", "host"]);
-    expect(roundTurnOrder(ids, "host", 3)).toEqual(["c", "host", "b"]);
-    expect(roundTurnOrder(ids, "host", 4)).toEqual(["host", "b", "c"]);
+  it("isPermutationOf accepts only a full reordering", () => {
+    const ids = ["a", "b", "c"];
+    expect(isPermutationOf(["c", "a", "b"], ids)).toBe(true);
+    expect(isPermutationOf(["a", "b"], ids)).toBe(false);
+    expect(isPermutationOf(["a", "a", "b"], ids)).toBe(false);
+    expect(isPermutationOf(["a", "b", "x"], ids)).toBe(false);
+    expect(isPermutationOf(["a", "b", 3], ids)).toBe(false);
+    expect(isPermutationOf("abc", ids)).toBe(false);
   });
-  it("puts the host first even if not first in join order", () => {
-    expect(roundTurnOrder(["b", "host", "c"], "host", 1)).toEqual(["host", "b", "c"]);
+  it("promotable takes the queue in order, as many as there are free seats", () => {
+    expect(promotable(["q1", "q2", "q3"], 10)).toEqual(["q1", "q2"]);
+    expect(promotable(["q1", "q2"], 12)).toEqual([]);
+    expect(promotable(["q1"], 3)).toEqual(["q1"]);
   });
 });
 
@@ -160,5 +172,15 @@ describe("leaving a running game", () => {
 
   it("returns an empty order when nobody is left", () => {
     expect(turnAfterLeave(["a"], 0, 0, "a")).toEqual({ order: [], offset: 0, currentId: null });
+  });
+});
+
+describe("hintsPerRound", () => {
+  it("is 5 up to 7x7 and grows on 8x8 (15), 9x9 (20), 10x10 (25)", () => {
+    for (const n of [3, 4, 5, 6, 7]) expect(hintsPerRound(n)).toBe(5);
+    expect(hintsPerRound(8)).toBe(15);
+    expect(hintsPerRound(9)).toBe(20);
+    expect(hintsPerRound(10)).toBe(25);
+    expect(hintsPerRound(10)).toBe(HINTS_MAX);
   });
 });

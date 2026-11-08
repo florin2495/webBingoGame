@@ -7,6 +7,8 @@ export const LINES_MIN = 1;
 export const LINES_MAX = 3;
 export const MIN_PLAYERS_TO_START = 2;
 export const NICKNAME_MAX = 10;
+export const MAX_PLAYERS = 12;
+export const MAX_SPECTATORS = 16;
 /**
  * Lobby/finished rooms are closed (deleted) after this long without activity. Activity includes
  * presence: every open room page polls /state, which refreshes the timer (see PRESENCE_TOUCH_MS),
@@ -20,7 +22,11 @@ export const PRESENCE_TOUCH_MS = 20_000;
 export function minutesLabel(n: number): string {
   return `${n} ${n >= 20 ? "de " : ""}${n === 1 ? "minut" : "minute"}`;
 }
-export const HINTS_PER_ROUND = 5;
+/** "Show" hints per round: 5, more on big grids (8x8: 15, 9x9: 20, 10x10: 25). Max = HINTS_MAX (DB check, migration 007). */
+export const HINTS_MAX = 25;
+export function hintsPerRound(size: number): number {
+  return size >= 8 ? (size - 8) * 5 + 15 : 5;
+}
 export const HINT_HIGHLIGHT_MS = 5000;
 
 export function isRoomExpired(status: string, lastActivityAt: string | Date, now = Date.now()): boolean {
@@ -29,16 +35,29 @@ export function isRoomExpired(status: string, lastActivityAt: string | Date, now
 }
 
 /**
- * Turn order for a round: host first, then everyone else in join order,
- * rotated so round 1 starts with the host, round 2 with the next player, etc.
+ * Play order for the next round = the seat order (lowest seat first, ties by join time; the caller sorts).
+ * Round 1: host first, then join order (the host sits at seat 0) unless the host reorders. At every
+ * new round the seats rotate one step (see rotateSeats), so the first caller changes unless reordered.
  */
-export function roundTurnOrder(playerIdsByJoin: string[], hostId: string | null, round: number): string[] {
-  const base = hostId && playerIdsByJoin.includes(hostId)
-    ? [hostId, ...playerIdsByJoin.filter((id) => id !== hostId)]
-    : [...playerIdsByJoin];
-  if (base.length === 0) return base;
-  const shift = (((round - 1) % base.length) + base.length) % base.length;
-  return [...base.slice(shift), ...base.slice(0, shift)];
+export function rotateSeats(idsBySeat: string[]): string[] {
+  return idsBySeat.length < 2 ? [...idsBySeat] : [...idsBySeat.slice(1), idsBySeat[0]];
+}
+
+/** True iff `order` is a permutation of `ids` (same ids, each once). */
+export function isPermutationOf(order: unknown, ids: readonly string[]): order is string[] {
+  if (!Array.isArray(order) || order.length !== ids.length) return false;
+  const want = new Set(ids);
+  const seen = new Set<string>();
+  for (const id of order) {
+    if (typeof id !== "string" || !want.has(id) || seen.has(id)) return false;
+    seen.add(id);
+  }
+  return true;
+}
+
+/** Queued spectators (oldest first) that fit in the free seats. `queue` is already ordered by queue time. */
+export function promotable<T>(queue: readonly T[], playerCount: number, maxPlayers = MAX_PLAYERS): T[] {
+  return queue.slice(0, Math.max(0, maxPlayers - playerCount));
 }
 
 export function isValidSize(n: unknown): n is number {

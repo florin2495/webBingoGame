@@ -8,7 +8,6 @@ import {
   MIN_PLAYERS_TO_START,
   minutesLabel,
   ROOM_IDLE_MINUTES,
-  roundTurnOrder,
   SIZE_MAX,
   SIZE_MIN,
 } from "@/lib/game";
@@ -189,11 +188,9 @@ export function Lobby({ state, token, refresh }: Props) {
   );
 }
 
-/** Who calls first this round: same rule as the server (host first in round 1, then rotating). */
+/** Who calls first this round: the first player of the lobby list (seat order, the host can reorder it). */
 function nextStarter(state: RoomState): string {
-  const ids = state.players.map((p) => p.id);
-  const order = roundTurnOrder(ids, state.room.hostPlayerId, state.room.round);
-  return state.players.find((p) => p.id === order[0])?.nickname ?? "host-ul";
+  return state.players[0]?.nickname ?? "host-ul";
 }
 
 /** Host-only rules editor, available whenever the room is in the lobby (incl. right after "Rundă nouă"). */

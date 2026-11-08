@@ -11,6 +11,14 @@ export interface PublicPlayer {
   connected: boolean;
 }
 
+/** Someone watching a room that was already running. `queued` = wants to play from the next round. */
+export interface PublicSpectator {
+  id: string;
+  nickname: string;
+  queued: boolean;
+  connected: boolean;
+}
+
 export interface CalledNumber {
   seq: number;
   number: number;
@@ -34,6 +42,12 @@ export interface RoomState {
   };
   /** Turn order while playing/finished, join order in the lobby. */
   players: PublicPlayer[];
+  /** Spectators in queue order first, then the others. Public: nickname and queue flag only. */
+  spectators: PublicSpectator[];
+  /** "spectator": read-only view; `me` is then a stand-in (never host, never ready) and board/marks are empty. */
+  role: "player" | "spectator";
+  /** Spectator only: queued to play from the next round. */
+  queued: boolean;
   me: PublicPlayer;
   board: number[] | null;
   marks: number[];

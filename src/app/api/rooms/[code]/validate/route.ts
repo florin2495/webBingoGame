@@ -2,6 +2,7 @@ import { countValidLines } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
 import { db, T } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
+import { reportRound } from "@/lib/server/leaderboard";
 import { getBoard, getMarks, listCalled, requireMember, requireStatus } from "@/lib/server/room";
 
 // POST /api/rooms/[code]/validate - checks the caller's board + marks against called numbers.
@@ -47,6 +48,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/va
     if (error) throw error;
     if (!data || data.length === 0) fail(409, "Jocul s-a terminat deja.");
 
+    await reportRound(room, room.turn_order, [player.id]);
     await notifyRoom(room.id, "game_won");
     return { won: true, lines, required: room.lines_to_win, message: "BINGO! Ai câștigat!" };
   });

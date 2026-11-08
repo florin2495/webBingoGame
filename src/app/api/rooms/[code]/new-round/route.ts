@@ -1,9 +1,11 @@
+import { rotateSeats } from "@/lib/game";
 import { notifyRoom } from "@/lib/server/broadcast";
 import { db, T } from "@/lib/server/db";
 import { fail, handle } from "@/lib/server/http";
-import { requireHost, requireMember, requireStatus } from "@/lib/server/room";
+import { promoteQueued } from "@/lib/server/membership";
+import { listPlayers, requireHost, requireMember, requireStatus } from "@/lib/server/room";
 
-// POST /api/rooms/[code]/new-round - host only, after a finished game. Back to the lobby.
+// POST /api/rooms/[code]/new-round - host only, after a finished game. Back to the lobby; seats rotate, queued spectators join.
 export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/new-round">) {
   return handle(async () => {
     const { code } = await ctx.params;
@@ -35,6 +37,15 @@ export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/ne
       .select("id");
     if (error) throw error;
     if (!data || data.length === 0) fail(409, "Runda nouă a fost deja pornită.");
+
+    // The first caller changes every round: seats rotate one step (the host can still reorder in the lobby).
+    const seated = rotateSeats((await listPlayers(room.id)).map((p) => p.id));
+    const rotated = await Promise.all(seated.map((id, seat) => db().from(T.players).update({ seat }).eq("id", id)));
+    const rotateError = rotated.find((r) => r.error)?.error;
+    if (rotateError) throw rotateError;
+
+    // Queued spectators take the free seats, after the current players, in queue order.
+    await promoteQueued(room.id);
 
     await notifyRoom(room.id, "new_round");
     return { ok: true };

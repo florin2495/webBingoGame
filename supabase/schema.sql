@@ -40,11 +40,13 @@ create table if not exists public.classicbingo_players (
   is_host    boolean not null default false,
   ready      boolean not null default false,
   hints_used smallint not null default 0                                 -- reset every round
-             constraint classicbingo_players_hints_used_range check (hints_used between 0 and 5),
+             constraint classicbingo_players_hints_used_range check (hints_used between 0 and 25),   -- 5, up to 25 on big grids (migration 007)
+
   kick_requested_at timestamptz,                                         -- pending kick (null = none), see migration 005
   joined_at  timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),                       -- presence: disconnected after 45 s, see migration 006
-  device_hash  text                                                      -- sha256 of the browser's device id, see migration 006
+  device_hash  text,                                                     -- sha256 of the browser's device id, see migration 006
+  seat         integer not null default 0                                -- play order, lowest first; host can reorder, see migration 008
 );
 create unique index if not exists classicbingo_players_room_nickname_uq on public.classicbingo_players (room_id, lower(nickname));
 create index if not exists classicbingo_players_room_idx on public.classicbingo_players (room_id);
@@ -105,6 +107,23 @@ create table if not exists public.classicbingo_marks (
 );
 
 -- ---------------------------------------------------------------------------
+-- classicbingo_spectators: joined a room that was already running (see migration 008). Same token / presence
+-- scheme as players. queued_at set = wants to play from the next round.
+-- ---------------------------------------------------------------------------
+create table if not exists public.classicbingo_spectators (
+  id           uuid primary key default gen_random_uuid(),
+  room_id      uuid not null references public.classicbingo_rooms (id) on delete cascade,
+  nickname     text not null check (char_length(nickname) between 1 and 20),
+  token_hash   text not null unique,
+  device_hash  text,
+  queued_at    timestamptz,
+  joined_at    timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+create unique index if not exists classicbingo_spectators_room_nickname_uq on public.classicbingo_spectators (room_id, lower(nickname));
+create index if not exists classicbingo_spectators_room_idx on public.classicbingo_spectators (room_id);
+
+-- ---------------------------------------------------------------------------
 -- Security: RLS on, NO policies -> anon / authenticated roles can read or
 -- write nothing. Only the service role (used by the Next.js Route Handlers,
 -- which bypasses RLS) touches these tables.
@@ -114,6 +133,7 @@ alter table public.classicbingo_players        enable row level security;
 alter table public.classicbingo_boards         enable row level security;
 alter table public.classicbingo_called_numbers enable row level security;
 alter table public.classicbingo_marks          enable row level security;
+alter table public.classicbingo_spectators     enable row level security;
 
-revoke all on public.classicbingo_rooms, public.classicbingo_players, public.classicbingo_boards, public.classicbingo_called_numbers, public.classicbingo_marks
+revoke all on public.classicbingo_rooms, public.classicbingo_players, public.classicbingo_boards, public.classicbingo_called_numbers, public.classicbingo_marks, public.classicbingo_spectators
   from anon, authenticated;
