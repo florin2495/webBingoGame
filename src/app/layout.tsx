@@ -31,6 +31,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // iOS fix (feedback #5): without a max scale Safari keeps a stale zoom after landscape -> portrait.
+  maximumScale: 1,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4f4f5" },
     { media: "(prefers-color-scheme: dark)", color: "#09090b" },

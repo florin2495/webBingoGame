@@ -19,7 +19,14 @@
   }
 }
 
+/* iOS fix (feedback #5): stop Safari inflating text on rotation and keeping a stale zoom afterwards. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
+  overflow-x: clip;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
