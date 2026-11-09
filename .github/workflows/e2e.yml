@@ -1,0 +1,38 @@
+name: E2E
+
+# Manual only (Actions tab > Run workflow, or `gh workflow run e2e.yml --ref main [-f base_url=...]`).
+# Drives the real API against the production DB: run it on main after the Vercel deploy of that version finished
+# (it checks the deployed client JS contains the package.json version).
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL including /classicbingo"
+        required: true
+        default: "https://games.hailatat.icu/classicbingo"
+
+permissions:
+  contents: read
+
+# Never two runs at once against the production DB.
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # scripts/e2e.mjs uses only Node built-ins: no npm ci needed.
+      - name: E2E
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          # Only for the cleanup safety net (deletes leftover e2e-test-* rooms after a failed run).
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/e2e.mjs "$BASE_URL"

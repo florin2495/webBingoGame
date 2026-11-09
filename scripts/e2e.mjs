@@ -1,6 +1,7 @@
 // End-to-end test of the Bingo API with real players. Usage: node scripts/e2e.mjs [baseUrl incl. /classicbingo]
 // Rooms are named "e2e-test-…" and deleted at the end (leave as every player, then a DB delete of leftovers
-// with the service key from .env.local as a safety net). Never sends feedback.
+// with the service key as a safety net: env NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, else .env.local).
+// Never sends feedback.
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 
@@ -338,16 +339,23 @@ async function main() {
   created.delete(code);
 }
 
-/** Safety net: delete rooms left behind by a failed run, straight in the DB (service key from .env.local). */
+/** Supabase URL + service key: environment (GitHub Actions secrets) first, else .env.local. */
+function supabaseEnv() {
+  const { NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
+  if (NEXT_PUBLIC_SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) return { NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY };
+  return Object.fromEntries(
+    readFileSync(new URL("../.env.local", import.meta.url), "utf8")
+      .split(/\r?\n/)
+      .filter((l) => l.includes("=") && !l.startsWith("#"))
+      .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim().replace(/^"|"$/g, "")]),
+  );
+}
+
+/** Safety net: delete rooms left behind by a failed run, straight in the DB (service key from env or .env.local). */
 async function cleanup() {
   if (created.size === 0) return;
   try {
-    const env = Object.fromEntries(
-      readFileSync(new URL("../.env.local", import.meta.url), "utf8")
-        .split(/\r?\n/)
-        .filter((l) => l.includes("=") && !l.startsWith("#"))
-        .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim().replace(/^"|"$/g, "")]),
-    );
+    const env = supabaseEnv();
     const url = `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/classicbingo_rooms?code=in.(${[...created].join(",")})&name=like.e2e-test-*`;
     const key = env.SUPABASE_SERVICE_ROLE_KEY;
     const res = await fetch(url, { method: "DELETE", headers: { apikey: key, authorization: `Bearer ${key}` } });

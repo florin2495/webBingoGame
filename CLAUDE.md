@@ -6,7 +6,7 @@
 - GitHub: personal account **florin2495** only (repo `florin2495/webBingoGame`, private). Never the work account.
   Local git identity is pinned in `.git/config`.
 - Every push to `main` deploys to production on Vercel: https://web-bingo-game.vercel.app
-- Feedback (`POST /api/feedback`) writes to `hub_feedback` (owned by florin2495/hailataticu-hub, slug `bingo`); this game must not be deployed before that table exists.
+- Feedback (`POST /api/feedback`) writes to `hub_feedback` (owned by florin2495/hailataticu-hub, slug `bingo`); this game must not be deployed before that table exists (it exists: verified 2026-11-09).
 - Ask the user before pushing (= deploying), unless they explicitly say to deploy.
 - **Before every push, bump the patch version** in `package.json` (and `npm install --package-lock-only`).
   It is shown in-game next to "Setări". Current: see `package.json`.
@@ -25,9 +25,9 @@ so this list is the source of truth. **Update it whenever the user confirms a mi
 | `supabase/migrations/004_classicbingo_prefix.sql` | yes (2026-11-06, verified) | renames all tables/constraints/indexes to `classicbingo_*`; breaks code < 1.2.3, deploy 1.2.3 right after |
 | `supabase/migrations/005_pending_kick.sql` | yes (2026-11-07, verified) | `classicbingo_players.kick_requested_at` (pending kick with 10 s "Ignoră"); run BEFORE deploying the code that reads it - until then every players query (and local dev, same DB) fails |
 | `supabase/migrations/006_reconnect.sql` | yes (2026-11-07, verified: service role 200, anon 401) | `classicbingo_players.last_seen_at`, `device_hash` + index (rejoin the same seat). Run BEFORE deploying the code that reads it - `PLAYER_COLUMNS` selects `last_seen_at`, so every players query fails until then |
-| `supabase/migrations/007_shows_by_size.sql` | **NO - goes into the single combined script** | `hints_used` check 0..25 ("Show" count by size: 5, 8x8 15, 9x9 20, 10x10 25). Run BEFORE deploying: an 8x8+ room hits the old check on its 6th Show |
-| `supabase/migrations/008_seats_spectators.sql` | **NO - goes into the single combined script** | `classicbingo_players.seat` (host-chosen order, rotated each round) + `classicbingo_spectators` table. Run BEFORE deploying: `PLAYER_COLUMNS` selects `seat`, so every players query (and local dev, same DB) fails until then |
-| hub `hub_leaderboard`, `hub_leaderboard_rounds` | owned by the hub repo (`000_Startup` migration 002) - **to run there** | Bingo only writes to them (`src/lib/server/leaderboard.ts`, best effort: if the tables are missing it logs and the game goes on). Do not deploy the reporting code before the hub migration ran |
+| `supabase/migrations/007_shows_by_size.sql` | yes (2026-11-08, via `D:\_DEv\ALL_MIGRATIONS.sql`, run before 008 in the same script; not verified separately: a check constraint can't be read without a write) | `hints_used` check 0..25 ("Show" count by size: 5, 8x8 15, 9x9 20, 10x10 25). Run BEFORE deploying: an 8x8+ room hits the old check on its 6th Show |
+| `supabase/migrations/008_seats_spectators.sql` | yes (2026-11-08, via `D:\_DEv\ALL_MIGRATIONS.sql`; verified 2026-11-09: `seat` and `classicbingo_spectators` readable with the service role) | `classicbingo_players.seat` (host-chosen order, rotated each round) + `classicbingo_spectators` table. Run BEFORE deploying: `PLAYER_COLUMNS` selects `seat`, so every players query (and local dev, same DB) fails until then |
+| hub `hub_leaderboard`, `hub_leaderboard_rounds` | yes (owned by the hub repo, `000_Startup` migration 002; verified 2026-11-09: both tables readable with the service role) | Bingo only writes to them (`src/lib/server/leaderboard.ts`, best effort: if the tables are missing it logs and the game goes on). Do not deploy the reporting code before the hub migration ran |
 
 Rules for schema changes:
 - The Supabase project is shared by all hub mini-games: every object of this game is prefixed `classicbingo_`
@@ -39,7 +39,8 @@ Rules for schema changes:
 - Never print or commit the keys in `.env.local`.
 
 ## Rejoin the same seat
-- `src/lib/reconnect.ts`: every member request stamps `last_seen_at` (at most every 10 s, in `requireMember`);
+- `src/lib/reconnect.ts`: every player or spectator request stamps `last_seen_at` (at most every 10 s, `touchSeen` in
+  `requireViewer`, `src/lib/server/room.ts`);
   re-joining with an existing nickname reclaims that seat (same player id, new token) from the same device
   (`device_hash`, from the browser's `bingo:device` id) or once the seat has been unseen for 45 s, also mid-game.
   `/state` exposes only a derived `connected` flag ("deconectat" badge); never select `token_hash`/`device_hash`
@@ -57,12 +58,24 @@ Rules for schema changes:
 - "Show" count = `hintsPerRound(size)` in `game.ts` (5; 8x8 15, 9x9 20, 10x10 25).
 - `reportRound` (validate win, or last player wins after leaves) writes `hub_leaderboard` (player_key = lowercased nickname).
 
-## Testing
-- `npm test` (Vitest, pure rules in `src/lib/game.ts`), `npx tsc --noEmit`, `npx eslint src`, `npx next build`.
-- End-to-end: `node scripts/e2e.mjs [baseUrl]` (default production `https://games.hailatat.icu/classicbingo`;
-  local: `http://localhost:3000/classicbingo`). Checks page / `_next` assets / version / manifest / icons /
-  `room/XXXXXX` over HTTP and that `web-bingo-game.vercel.app/classicbingo` serves the same build, then drives the
-  real API with 3 players: create (password), join, wrong password, rejoin (saved token, same device, old token dead,
-  mid-game), settings, boards, ready, start, out-of-turn / illegal calls, private boards and marks, hint, kick with
-  "Ignoră", skip, full game to a validated win, reveal, new round, pending kick enforced, leave mid-game (last one
-  wins), lobby kick. Rooms are named `e2e-test-…` and deleted at the end; it never calls `/api/feedback`.
+## Testing (GitHub Actions, manual only)
+All checks run in GitHub Actions, never locally unless the user explicitly asks. Every workflow is `workflow_dispatch`
+only (no automatic trigger, the user's choice): nothing gates a push, and Vercel deploys `main` regardless.
+Start one with `gh workflow run <file> --ref main`, then `gh run watch` (or the Actions tab, "Run workflow").
+| Workflow | Runs |
+| --- | --- |
+| `.github/workflows/check.yml` "Check code" | `npx next typegen` + `npx tsc --noEmit` (typegen first, so route types in `.next/types` are checked), `npx eslint src`, `npx next build`. Every step runs even if an earlier one failed |
+| `.github/workflows/unit-tests.yml` "Unit tests" | `npm test` (Vitest: `src/lib/game.test.ts`, `kick.test.ts`, `reconnect.test.ts`; pure logic, no DB) |
+| `.github/workflows/e2e.yml` "E2E" | `node scripts/e2e.mjs <base_url>` (input, default production `https://games.hailatat.icu/classicbingo`); one run at a time |
+
+- E2E needs the repo secrets `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (only for the cleanup safety net;
+  locally the script falls back to `.env.local`). It checks that the deployed client JS contains the `package.json`
+  version of the checked-out ref, so run it on `main` after the Vercel deploy of that version has finished.
+- What E2E does: checks page / `_next` assets / version / manifest / icons / `room/XXXXXX` over HTTP and that
+  `web-bingo-game.vercel.app/classicbingo` serves the same build, then drives the real API (production DB) with 3 players:
+  create (password), join, wrong password, rejoin (saved token, same device, old token dead, mid-game), settings, boards,
+  ready, start, spectators (join a running room, 403 on player routes, queue toggle and order, spectator rejoin),
+  out-of-turn / illegal calls, private boards and marks, called numbers cannot be un-ticked, hint, kick with "Ignoră", skip,
+  full game to a validated win, reveal, new round (seats rotated, queued spectators promoted), host reorder, pending kick
+  enforced, leave mid-game (last one wins), lobby kick. Rooms are named `e2e-test-…` and deleted at the end; it never
+  calls `/api/feedback`.

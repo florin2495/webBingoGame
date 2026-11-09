@@ -1,0 +1,29 @@
+name: Check code
+
+# Manual only (Actions tab > Run workflow, or `gh workflow run check.yml --ref main`).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Every check below runs even if an earlier one failed, so one run shows all the errors.
+      - name: Typecheck (route types + tsc)
+        run: npx next typegen && npx tsc --noEmit
+      - name: ESLint
+        if: success() || failure()
+        run: npx eslint src
+      - name: Build
+        if: success() || failure()
+        run: npx next build
