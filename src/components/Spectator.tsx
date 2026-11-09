@@ -47,8 +47,14 @@ export function SpectatorView({ state, token, refresh }: Props) {
     <div className="flex flex-col gap-4">
       <Card className="border-sky-300 bg-sky-50 dark:border-sky-800 dark:bg-sky-950">
         <h2 className="font-bold">👀 Ești spectator</h2>
-        <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{status}</p>
-        <Button className="mt-3 w-full" variant={queued ? "secondary" : "primary"} disabled={busy} onClick={() => void toggleQueue()}>
+        <p data-testid="spectator-status" className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{status}</p>
+        <Button
+          className="mt-3 w-full"
+          data-testid="queue-toggle"
+          variant={queued ? "secondary" : "primary"}
+          disabled={busy}
+          onClick={() => void toggleQueue()}
+        >
           {queued ? "Ești în coadă · apasă ca să renunți" : "Intră la runda următoare"}
         </Button>
         <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
@@ -68,9 +74,9 @@ export function SpectatorView({ state, token, refresh }: Props) {
         {called.length === 0 ? (
           <p className="text-sm text-zinc-500">Încă nimic.</p>
         ) : (
-          <ol className="flex flex-wrap gap-1.5">
+          <ol data-testid="called-list" className="flex flex-wrap gap-1.5">
             {[...called].reverse().map((c) => (
-              <li key={c.seq} className="flex items-baseline gap-1 rounded-md bg-zinc-100 px-2 py-1 dark:bg-zinc-900">
+              <li key={c.seq} data-number={c.number} className="flex items-baseline gap-1 rounded-md bg-zinc-100 px-2 py-1 dark:bg-zinc-900">
                 <span className="text-[10px] text-zinc-500">#{c.seq}</span>
                 <span className="font-bold tabular-nums">{c.number}</span>
                 <span className="max-w-16 truncate text-[10px] text-zinc-500">{c.playerId ? nick.get(c.playerId) : ""}</span>
@@ -96,7 +102,7 @@ export function SpectatorList({ spectators, meId }: { spectators: PublicSpectato
       <h2 className="mb-1 text-sm font-bold">
         Spectatori <span className="font-normal text-zinc-500">({spectators.length})</span>
       </h2>
-      <ul className="flex flex-wrap gap-1.5 text-xs">
+      <ul data-testid="spectator-list" className="flex flex-wrap gap-1.5 text-xs">
         {spectators.map((s) => (
           <li
             key={s.id}
