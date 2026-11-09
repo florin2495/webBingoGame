@@ -21,6 +21,8 @@ interface GridProps {
   disabled?: boolean;
   /** Smaller variant for the end-of-game reveal. */
   compact?: boolean;
+  /** data-testid of the grid (Playwright tests in tests/ui). */
+  testId?: string;
 }
 
 const textSize = (n: number, compact: boolean) => {
@@ -39,9 +41,10 @@ const styles: Record<CellState, string> = {
   last: "bg-white dark:bg-zinc-900 border-orange-500 ring-4 ring-orange-500",
 };
 
-export function Grid({ size, cells, stateOf, onCellClick, disabled, compact = false }: GridProps) {
+export function Grid({ size, cells, stateOf, onCellClick, disabled, compact = false, testId }: GridProps) {
   return (
     <div
+      data-testid={testId}
       className={`mx-auto grid w-full ${compact ? "max-w-[300px] gap-0.5" : "max-w-[480px] gap-1 sm:gap-1.5"}`}
       style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
     >
@@ -55,6 +58,7 @@ export function Grid({ size, cells, stateOf, onCellClick, disabled, compact = fa
             onClick={() => onCellClick?.(value, i)}
             aria-label={value === null ? `Celula goală ${i + 1}` : `Numărul ${value}`}
             aria-pressed={state === "mine" || state === "marked"}
+            data-state={state}
             className={`aspect-square select-none border font-semibold tabular-nums transition-colors ${compact ? "rounded" : "rounded-md"} ${textSize(size, compact)} ${styles[state]} enabled:active:scale-95 disabled:cursor-default`}
           >
             {value ?? ""}

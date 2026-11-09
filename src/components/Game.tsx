@@ -293,6 +293,7 @@ export function Game({ state, token, refresh, patch }: Props) {
           {isHost ? (
             <Button
               className="mt-3 w-full"
+              data-testid="new-round"
               disabled={busy}
               onClick={() => void act(() => api(`${base}/new-round`, { token, body: {} }))}
             >
@@ -331,7 +332,7 @@ export function Game({ state, token, refresh, patch }: Props) {
           </p>
         )}
         {board ? (
-          <Grid size={room.size} cells={board} stateOf={cellState} onCellClick={playing ? onCell : undefined} />
+          <Grid testId="my-board" size={room.size} cells={board} stateOf={cellState} onCellClick={playing ? onCell : undefined} />
         ) : (
           <p className="py-6 text-center text-sm text-zinc-500">
             Ai intrat după ce jocul a pornit. Vei juca din runda următoare.
@@ -355,7 +356,7 @@ export function Game({ state, token, refresh, patch }: Props) {
               >
                 Show {state.hintsLeft}/{hintsPerRound(room.size)}
               </Button>
-              <Button variant="secondary" className="flex-1 basis-0" onClick={() => void validate()} disabled={busy}>
+              <Button variant="secondary" className="flex-1 basis-0" data-testid="validate" onClick={() => void validate()} disabled={busy}>
                 Validează ({room.linesToWin} {room.linesToWin === 1 ? "linie" : "linii"})
               </Button>
             </div>
@@ -385,6 +386,7 @@ export function Game({ state, token, refresh, patch }: Props) {
           </h2>
           {playing && (
             <span
+              data-testid="turn-badge"
               className={`max-w-[55%] truncate rounded-lg border-2 px-2.5 py-1 text-sm ${
                 myTurn
                   ? "animate-pulse border-indigo-600 bg-indigo-600 text-white"
@@ -410,10 +412,11 @@ export function Game({ state, token, refresh, patch }: Props) {
         {called.length === 0 ? (
           <p className="text-sm text-zinc-500">Încă nimic.</p>
         ) : (
-          <ol className="flex flex-wrap gap-1.5">
+          <ol data-testid="called-list" className="flex flex-wrap gap-1.5">
             {[...called].reverse().map((c) => (
               <li
                 key={c.seq}
+                data-number={c.number}
                 title={`#${c.seq} · ${c.playerId ? nick.get(c.playerId) : ""}`}
                 className={`flex items-baseline gap-1 rounded-md px-2 py-1 ${
                   c.playerId === me.id
@@ -487,6 +490,7 @@ export function RevealedBoards({ state }: { state: RoomState }) {
               </summary>
               <div className="pt-2">
                 <Grid
+                  testId="revealed-board"
                   compact
                   size={room.size}
                   cells={r.board}

@@ -247,7 +247,7 @@ function LeaveButton({ state, token }: { state: RoomState; token: string }) {
 
   return (
     <div className="pb-6 pt-2 text-center">
-      <Button variant="danger" className="w-full" onClick={() => void leave()} disabled={busy}>
+      <Button variant="danger" className="w-full" data-testid="leave" onClick={() => void leave()} disabled={busy}>
         {busy ? "Se iese…" : room.status === "playing" && !spectator ? "Părăsește jocul" : "Părăsește camera"}
       </Button>
       <div className="mt-2">
@@ -356,7 +356,7 @@ function JoinForm({ code }: { code: string }) {
             autoComplete="off"
           />
           <ErrorText>{error}</ErrorText>
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" data-testid="join-submit" disabled={busy}>
             {busy ? "Se încarcă…" : "Intră"}
           </Button>
         </form>

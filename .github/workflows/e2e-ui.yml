@@ -1,0 +1,50 @@
+name: E2E UI (Playwright)
+
+# Manual only (Actions tab > Run workflow, or `gh workflow run e2e-ui.yml --ref main [-f base_url=...]`).
+# Two real browsers play a live game on the deployed site (production DB), on desktop Chromium and an emulated
+# iPhone (WebKit). Run it after the Vercel deploy of the version under test has finished.
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL including /classicbingo"
+        required: true
+        default: "https://games.hailatat.icu/classicbingo"
+
+permissions:
+  contents: read
+
+# Same group as the API E2E: never two e2e runs at once against the production DB.
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Playwright
+        env:
+          E2E_BASE_URL: ${{ inputs.base_url }}
+          # Only for the cleanup safety net (deletes a leftover e2e-test-ui-* room after a failed run).
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx playwright test
+      - name: Upload report (traces, screenshots, videos)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

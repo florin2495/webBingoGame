@@ -67,6 +67,7 @@ Start one with `gh workflow run <file> --ref main`, then `gh run watch` (or the 
 | `.github/workflows/check.yml` "Check code" | `npx next typegen` + `npx tsc --noEmit` (typegen first, so route types in `.next/types` are checked), `npx eslint src`, `npx next build`. Every step runs even if an earlier one failed |
 | `.github/workflows/unit-tests.yml` "Unit tests" | `npm test` (Vitest: `src/lib/game.test.ts`, `kick.test.ts`, `reconnect.test.ts`; pure logic, no DB) |
 | `.github/workflows/e2e.yml` "E2E" | `node scripts/e2e.mjs <base_url>` (input, default production `https://games.hailatat.icu/classicbingo`); one run at a time |
+| `.github/workflows/e2e-ui.yml` "E2E UI (Playwright)" | `npx playwright test` (`playwright.config.ts`, tests in `tests/ui/*.e2e.ts`) against `base_url` (`E2E_BASE_URL`, default production), on desktop Chromium and an emulated iPhone 13 (WebKit). Same concurrency group as "E2E". On failure the report (traces, screenshots, videos) is uploaded as the `playwright-report` artifact |
 
 - E2E needs the repo secrets `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (only for the cleanup safety net;
   locally the script falls back to `.env.local`). It checks that the deployed client JS contains the `package.json`
@@ -79,3 +80,12 @@ Start one with `gh workflow run <file> --ref main`, then `gh run watch` (or the 
   full game to a validated win, reveal, new round (seats rotated, queued spectators promoted), host reorder, pending kick
   enforced, leave mid-game (last one wins), lobby kick. Rooms are named `e2e-test-…` and deleted at the end; it never
   calls `/api/feedback`.
+- What E2E UI does (`tests/ui/game.e2e.ts`): two browser contexts (= two devices) create a 3x3 room, join by link,
+  generate boards, ready, start, and play to a validated win. Every call must appear on the other screen within 5 s
+  without a reload (polling is 15 s, so this checks Realtime), marks get `data-state` "mine"/"marked", then the BINGO
+  pop-up, revealed cards, new round followed live, both leave. Rooms are `e2e-test-ui-…`; a leftover is deleted with the
+  service key from the same repo secrets.
+- Playwright files are `*.e2e.ts`, never `*.spec.ts` / `*.test.ts` (Vitest would pick those up).
+- The UI tests find elements by `data-testid` (`my-board`, `called-list` items with `data-number`, `turn-badge`,
+  `generate-board`, `ready`, `start-game`, `validate`, `new-round`, `revealed-board`, `home-submit`, `join-submit`, `leave`),
+  grid cells by `aria-label` "Numărul N" and their `data-state` (`Grid.tsx`). Renaming or removing one breaks `tests/ui`.

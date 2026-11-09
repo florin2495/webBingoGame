@@ -201,7 +201,7 @@ export function Home() {
           )}
 
           <ErrorText>{error}</ErrorText>
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" data-testid="home-submit" disabled={busy}>
             {busy ? "Se încarcă…" : tab === "create" ? "Creează camera" : "Intră"}
           </Button>
         </form>

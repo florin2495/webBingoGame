@@ -125,7 +125,7 @@ export function Lobby({ state, token, refresh }: Props) {
             </div>
           </>
         ) : board ? (
-          <Grid size={room.size} cells={board} stateOf={() => "plain"} />
+          <Grid testId="my-board" size={room.size} cells={board} stateOf={() => "plain"} />
         ) : (
           <p className="py-6 text-center text-sm text-zinc-500">
             Nu ai încă o matrice. Generează una sau completeaz-o manual.
@@ -134,7 +134,7 @@ export function Lobby({ state, token, refresh }: Props) {
 
         {!me.ready && !manual && (
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant="secondary" onClick={() => void generate()} disabled={busy}>
+            <Button variant="secondary" data-testid="generate-board" onClick={() => void generate()} disabled={busy}>
               {board ? "Generează alta" : "Generează matrice"}
             </Button>
             <Button variant="secondary" onClick={startManual} disabled={busy}>
@@ -144,7 +144,7 @@ export function Lobby({ state, token, refresh }: Props) {
         )}
 
         {!me.ready && (
-          <Button className="mt-3 w-full" onClick={() => void ready()} disabled={busy || !board || manual !== null}>
+          <Button className="mt-3 w-full" data-testid="ready" onClick={() => void ready()} disabled={busy || !board || manual !== null}>
             I&apos;m ready
           </Button>
         )}
@@ -163,7 +163,7 @@ export function Lobby({ state, token, refresh }: Props) {
         <PlayerList state={state} mode="lobby" token={token} refresh={refresh} />
         {isHost ? (
           <>
-            <Button className="mt-3 w-full" onClick={() => void start()} disabled={busy || !allReady}>
+            <Button className="mt-3 w-full" data-testid="start-game" onClick={() => void start()} disabled={busy || !allReady}>
               Pornește jocul
             </Button>
             {!allReady && (
