@@ -80,12 +80,18 @@ Start one with `gh workflow run <file> --ref main`, then `gh run watch` (or the 
   full game to a validated win, reveal, new round (seats rotated, queued spectators promoted), host reorder, pending kick
   enforced, leave mid-game (last one wins), lobby kick. Rooms are named `e2e-test-…` and deleted at the end; it never
   calls `/api/feedback`.
-- What E2E UI does (`tests/ui/game.e2e.ts`): two browser contexts (= two devices) create a 3x3 room, join by link,
-  generate boards, ready, start, and play to a validated win. Every call must appear on the other screen within 5 s
-  without a reload (polling is 15 s, so this checks Realtime), marks get `data-state` "mine"/"marked", then the BINGO
-  pop-up, revealed cards, new round followed live, both leave. Rooms are `e2e-test-ui-…`; a leftover is deleted with the
-  service key from the same repo secrets.
+- What E2E UI does (`tests/ui/`, shared steps in `helpers.ts`; every change must reach the other screens within 5 s
+  without a reload, polling is 15 s, so this checks Realtime):
+  - `game.e2e.ts` (both projects): two browser contexts (= two devices) create a 3x3 room, join by link, boards, ready,
+    start, play to a validated win (marks get `data-state` "mine"/"marked"), BINGO pop-up, revealed cards, new round, leave.
+  - `spectator.e2e.ts` (desktop Chromium only): a third person joins mid-game = spectator (no board, no player buttons),
+    the players see them, they see every call, queue ("în coadă" seen by the players), see the end, and the new round
+    makes them a player.
+  - `mobile.e2e.ts` (iPhone only): 10x10 board, no horizontal scroll on home / lobby / game, every cell >= 24 px,
+    a touch tap calls a number.
+  Rooms are `e2e-test-ui-…`; a leftover is deleted with the service key from the same repo secrets.
 - Playwright files are `*.e2e.ts`, never `*.spec.ts` / `*.test.ts` (Vitest would pick those up).
 - The UI tests find elements by `data-testid` (`my-board`, `called-list` items with `data-number`, `turn-badge`,
-  `generate-board`, `ready`, `start-game`, `validate`, `new-round`, `revealed-board`, `home-submit`, `join-submit`, `leave`),
+  `generate-board`, `ready`, `start-game`, `validate`, `new-round`, `revealed-board`, `home-submit`, `join-submit`, `leave`,
+  `spectator-status`, `queue-toggle`, `spectator-list`),
   grid cells by `aria-label` "Numărul N" and their `data-state` (`Grid.tsx`). Renaming or removing one breaks `tests/ui`.
