@@ -391,7 +391,13 @@ export function Game({ state, token, refresh, patch }: Props) {
                   : "border-indigo-500 bg-indigo-50 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100"
               }`}
             >
-              Tura: <strong>{myTurn ? "tu" : (turnName ?? "—")}</strong>
+              {myTurn ? (
+                <strong>Tura ta</strong>
+              ) : (
+                <>
+                  Tura lui <strong>{turnName ?? "—"}</strong>
+                </>
+              )}
               {!myTurn && (
                 <>
                   {" "}

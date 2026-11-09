@@ -71,7 +71,9 @@ export interface RoomListItem {
   size: number;
   linesToWin: number;
   hasPassword: boolean;
+  status: "lobby" | "playing" | "finished";
   players: number;
+  spectators: number;
 }
 
 export interface Session {

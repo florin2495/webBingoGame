@@ -6,15 +6,14 @@ import { cleanText, fail, handle, isUniqueViolation, readJson } from "@/lib/serv
 import { cleanupExpiredRooms } from "@/lib/server/room";
 import type { RoomListItem } from "@/lib/types";
 
-// GET /api/rooms - public list of rooms that can be joined right now (lobby, not idle).
+// GET /api/rooms - public list of all open rooms (lobby or running, not idle). Joining a running room = spectator.
 export async function GET() {
   await connection(); // always request-time, never prerendered at build
   return handle(async () => {
     await cleanupExpiredRooms();
     const { data, error } = await db()
       .from(T.rooms)
-      .select("code, name, size, lines_to_win, password_hash, last_activity_at, players:classicbingo_players!classicbingo_players_room_id_fkey(count)")
-      .eq("status", "lobby")
+      .select("code, name, size, lines_to_win, password_hash, status, last_activity_at, players:classicbingo_players!classicbingo_players_room_id_fkey(count), spectators:classicbingo_spectators!classicbingo_spectators_room_id_fkey(count)")
       .order("last_activity_at", { ascending: false })
       .limit(50);
     if (error) throw error;
@@ -24,7 +23,9 @@ export async function GET() {
       size: r.size,
       linesToWin: r.lines_to_win,
       hasPassword: r.password_hash !== null,
+      status: r.status as RoomListItem["status"],
       players: (r.players as unknown as { count: number }[])[0]?.count ?? 0,
+      spectators: (r.spectators as unknown as { count: number }[])[0]?.count ?? 0,
     }));
     return { rooms };
   });
