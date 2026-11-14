@@ -38,6 +38,12 @@ Rules for schema changes:
   service key from `.env.local` (e.g. select the new column, or try a value the new constraint allows).
 - Never print or commit the keys in `.env.local`.
 
+## Abandoned rooms (120 s)
+- `GET /api/rooms` (the room list behind "Intră în cameră") first runs `cleanupAbandonedRooms` (`src/lib/server/room.ts`):
+  every room in ANY status (also `playing`) whose `last_activity_at` is older than `ROOM_ABANDONED_MS` (120 s, `game.ts`)
+  and with no player/spectator `last_seen_at` within 120 s is deleted (cascade). Open room pages keep both fresh
+  (`/state` polls every 15 s), so only rooms nobody has open disappear. The 10-minute lobby/finished expiry stays too.
+
 ## Rejoin the same seat
 - `src/lib/reconnect.ts`: every player or spectator request stamps `last_seen_at` (at most every 10 s, `touchSeen` in
   `requireViewer`, `src/lib/server/room.ts`);

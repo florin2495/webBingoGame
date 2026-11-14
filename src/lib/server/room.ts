@@ -1,5 +1,13 @@
 import "server-only";
-import { currentTurnIndex, hintsPerRound, isRoomExpired, minutesLabel, ROOM_IDLE_MINUTES } from "@/lib/game";
+import {
+  currentTurnIndex,
+  hintsPerRound,
+  isRoomAbandoned,
+  isRoomExpired,
+  minutesLabel,
+  ROOM_ABANDONED_MS,
+  ROOM_IDLE_MINUTES,
+} from "@/lib/game";
 import { kickRemainingMs } from "@/lib/kick";
 import { isConnected, LAST_SEEN_TOUCH_MS } from "@/lib/reconnect";
 import type { CalledNumber, PublicPlayer, PublicSpectator, RevealedBoard, RoomState } from "@/lib/types";
@@ -37,6 +45,37 @@ export async function cleanupExpiredRooms(): Promise<void> {
   const cutoff = new Date(Date.now() - ROOM_IDLE_MINUTES * 60_000).toISOString();
   const { error } = await db().from(T.rooms).delete().in("status", ["lobby", "finished"]).lt("last_activity_at", cutoff);
   if (error) console.error("cleanup failed", error);
+}
+
+/**
+ * Deletes rooms in ANY status (also "playing") with no activity for ROOM_ABANDONED_MS and no player or
+ * spectator seen within it (see isRoomAbandoned). Best effort: a failure is logged, never thrown.
+ */
+export async function cleanupAbandonedRooms(): Promise<void> {
+  const now = Date.now();
+  const cutoff = new Date(now - ROOM_ABANDONED_MS).toISOString();
+  const { data, error } = await db()
+    .from(T.rooms)
+    .select(
+      "id, last_activity_at, players:classicbingo_players!classicbingo_players_room_id_fkey(last_seen_at), spectators:classicbingo_spectators!classicbingo_spectators_room_id_fkey(last_seen_at)",
+    )
+    .lt("last_activity_at", cutoff)
+    .limit(200);
+  if (error) {
+    console.error("abandoned cleanup (select) failed", error);
+    return;
+  }
+  type Seen = { last_seen_at: string | null }[] | null;
+  const ids = (data ?? [])
+    .filter((r) => {
+      const seen = [...((r.players as Seen) ?? []), ...((r.spectators as Seen) ?? [])].map((m) => m.last_seen_at);
+      return isRoomAbandoned(r.last_activity_at as string, seen, now);
+    })
+    .map((r) => r.id as string);
+  if (ids.length === 0) return;
+  // Re-check the activity cutoff in the delete itself, so a room touched meanwhile survives.
+  const { error: delError } = await db().from(T.rooms).delete().in("id", ids).lt("last_activity_at", cutoff);
+  if (delError) console.error("abandoned cleanup (delete) failed", delError);
 }
 
 /** Records activity on a room, restarting its idle timer. */
