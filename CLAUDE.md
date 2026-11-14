@@ -3,7 +3,7 @@
 # webBingoGame - project notes for Claude
 
 ## Accounts and deploy
-- GitHub: personal account **florin2495** only (repo `florin2495/webBingoGame`, private). Never the work account.
+- GitHub: personal account **florin2495** only (repo `florin2495/webBingoGame`, public). Never the work account.
   Local git identity is pinned in `.git/config`.
 - Every push to `main` deploys to production on Vercel: https://web-bingo-game.vercel.app
 - Feedback (`POST /api/feedback`) writes to `hub_feedback` (owned by florin2495/hailataticu-hub, slug `bingo`); this game must not be deployed before that table exists (it exists: verified 2026-11-09).
@@ -65,7 +65,8 @@ Rules for schema changes:
 - `reportRound` (validate win, or last player wins after leaves) writes `hub_leaderboard` (player_key = lowercased nickname).
 
 ## Testing (GitHub Actions, manual only)
-All checks run in GitHub Actions, never locally unless the user explicitly asks. Every workflow is `workflow_dispatch`
+All checks run in GitHub Actions on the free tier (public repo, standard `ubuntu-latest` runners only, never billed
+runners), never locally (user's rule, see `D:\_DEv\CLAUDE.md`). Every workflow is `workflow_dispatch`
 only (no automatic trigger, the user's choice): nothing gates a push, and Vercel deploys `main` regardless.
 Start one with `gh workflow run <file> --ref main`, then `gh run watch` (or the Actions tab, "Run workflow").
 | Workflow | Runs |
