@@ -29,7 +29,7 @@ Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să n
 - **Ordinea turelor:** în runda 1 începe host-ul, apoi ceilalți în ordinea intrării. La fiecare rundă nouă
   începe următorul jucător (rotație).
 - **Lista de camere:** în „Intră în cameră” vezi camerele deschise și intri direct. Camerele cu parolă au 🔒.
-- **Închidere automată:** o cameră în lobby, sau terminată, se închide după 10 minute în care nimeni nu o mai are deschisă (fiecare pagină deschisă trimite un semnal de prezență la 15 secunde). Jocurile în desfășurare nu se închid automat.
+- **Închidere automată:** o cameră (în lobby, în joc sau terminată) se închide după 10 minute în care nimeni nu o mai are deschisă (fiecare pagină deschisă trimite un semnal de prezență la 60 de secunde).
 - **Arată numerele ratate:** de 5 ori pe rundă, încercuiește cu galben, timp de 5 secunde, numerele strigate
   pe care nu le-ai bifat. Dacă ești la zi, nu se consumă nicio utilizare.
 - **Confirmare la strigare:** o poți dezactiva. Atunci numărul apăsat pe tura ta se strigă imediat.
@@ -38,7 +38,7 @@ Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să n
 - **Reguli editabile:** host-ul poate schimba N și numărul de linii cât timp camera e în lobby (deci și după „Rundă nouă”). Schimbarea lui N șterge matricile pregătite. Orice schimbare resetează „ready”.
 - **Părăsește jocul:** oricine poate ieși din cameră. Dacă pleacă host-ul, devine host următorul jucător. În timpul jocului, tura trece mai departe fără să blocheze. Dacă rămâne un singur jucător, câștigă el. Când pleacă ultimul, camera se închide.
 - **Kick:** host-ul poate scoate un jucător (butonul „Scoate”). Nu e ban: poate reintra cât camera e în lobby.
-- **Revino pe locul tău:** dacă pierzi conexiunea sau închizi tab-ul, intri din nou cu același nickname și îți reiei locul (aceeași matrice, aceleași bife, aceeași tură), chiar și în timpul jocului. De pe același dispozitiv merge oricând; de pe alt dispozitiv, după 45 de secunde fără semnal („deconectat” în listă). Pe pagina de start apare „Revino în camera …” pentru camerele în care ai încă loc. Parola camerei e protecția reală.
+- **Revino pe locul tău:** dacă pierzi conexiunea sau închizi tab-ul, intri din nou cu același nickname și îți reiei locul (aceeași matrice, aceleași bife, aceeași tură), chiar și în timpul jocului. De pe același dispozitiv merge oricând; de pe alt dispozitiv, după 301 secunde (puțin peste 5 minute) fără semnal („deconectat” în listă). Pe pagina de start apare „Revino în camera …” pentru camerele în care ai încă loc. Parola camerei e protecția reală.
 - **Sunet:** un fragment audio (`public/sounds/line.mp3`) pornește când completezi o linie. Se poate opri din joc.
 
 ## Arhitectură, pe scurt
@@ -48,7 +48,7 @@ Host-ul poate **sări tura** unui jucător care nu mai răspunde, ca jocul să n
   Browserul nu poate citi sau scrie direct în DB.
 - Live: după fiecare modificare, serverul trimite un semnal **Supabase Realtime Broadcast** pe topicul
   `room:<uuid>`. Clientul face apoi refetch la `/api/rooms/<cod>/state`, care e autentificat.
-  Semnalul nu conține date de joc. Există și polling la 15 s, ca rezervă.
+  Semnalul nu conține date de joc. Există și polling la 60 s, ca rezervă.
 - Postgres Changes **nu** funcționează aici, pentru că clientul anonim nu are acces RLS. De aceea se folosește Broadcast.
 
 Detalii: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Schema: [supabase/schema.sql](supabase/schema.sql).
@@ -65,7 +65,7 @@ Detalii: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Schema: [supabase/schema.
    - `anon` / publishable key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `service_role` / secret key → `SUPABASE_SERVICE_ROLE_KEY` (**secret**, nu-l pune niciodată în cod)
 4. **Realtime → Settings**: lasă activată opțiunea de acces la canale publice (*Allow public access*).
-   Aplicația folosește canale Broadcast publice, deci fără ea nu primești update-uri live (doar polling la 15 s).
+   Aplicația folosește canale Broadcast publice, deci fără ea nu primești update-uri live (doar polling la 60 s).
 
 ### 2. Local
 

@@ -23,7 +23,7 @@ supabase.channel("room:<id>") ◀───────────────�
    refetch la `/state`, care e autentificat. Un canal public de Broadcast poate fi ascultat sau
    chiar folosit pentru trimitere de oricine știe topicul. Cel mai rău caz e un refetch în plus,
    niciodată o matrice divulgată. Topicul folosește UUID-ul camerei, nu codul de 6 caractere.
-   Clientul face și polling la 15 s, ca rezervă dacă se pierde conexiunea WebSocket.
+   Clientul face și polling la 60 s, ca rezervă dacă se pierde conexiunea WebSocket.
 3. **Identitatea jucătorului = token aleator.** La creare sau intrare, serverul generează 32 de bytes
    random. Clientul îl ține în `localStorage`, iar DB-ul păstrează doar SHA-256. Fiecare request trimite
    `x-player-token`, iar serverul verifică `token → player` și `player.room_id == camera din URL`.
@@ -52,7 +52,7 @@ supabase.channel("room:<id>") ◀───────────────�
 | Metodă | Rută | Cine | Ce face |
 | --- | --- | --- | --- |
 | POST | `/api/rooms` | oricine | creează camera + jucătorul host |
-| POST | `/[code]/join` | oricine | intră în cameră (doar în lobby); cu nickname-ul unui loc existent îl reia (același dispozitiv sau loc deconectat ≥ 45 s), și în timpul jocului |
+| POST | `/[code]/join` | oricine | intră în cameră (doar în lobby); cu nickname-ul unui loc existent îl reia (același dispozitiv sau loc deconectat ≥ 301 s), și în timpul jocului |
 | GET | `/[code]/state` | membru | starea camerei + matricea și bifările proprii |
 | POST | `/[code]/board` | membru, lobby, ne-ready | `{generate:true}` sau `{cells:[...]}` |
 | POST | `/[code]/ready` | membru, lobby, matrice salvată | marchează ready, blochează matricea |

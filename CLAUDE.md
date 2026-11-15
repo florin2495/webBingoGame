@@ -38,17 +38,19 @@ Rules for schema changes:
   service key from `.env.local` (e.g. select the new column, or try a value the new constraint allows).
 - Never print or commit the keys in `.env.local`.
 
-## Abandoned rooms (120 s)
+## Abandoned rooms (600 s)
 - `GET /api/rooms` (the room list behind "Intră în cameră") first runs `cleanupAbandonedRooms` (`src/lib/server/room.ts`):
-  every room in ANY status (also `playing`) whose `last_activity_at` is older than `ROOM_ABANDONED_MS` (120 s, `game.ts`)
-  and with no player/spectator `last_seen_at` within 120 s is deleted (cascade). Open room pages keep both fresh
-  (`/state` polls every 15 s), so only rooms nobody has open disappear. The 10-minute lobby/finished expiry stays too.
+  every room in ANY status (also `playing`) whose `last_activity_at` is older than `ROOM_ABANDONED_MS` (600 s, `game.ts`)
+  and with no player/spectator `last_seen_at` within 600 s is deleted (cascade). Open room pages keep both fresh
+  (`/state` polls every 60 s, `POLL_MS` in `RoomClient.tsx`), so only rooms nobody has open disappear. The 10-minute
+  lobby/finished expiry (`ROOM_IDLE_MINUTES`, lazy in `getRoomByCode`) stays too. Unit-tested with a mocked DB in
+  `src/lib/server/room.test.ts`. The "room gone" 404 (`GONE`) says only "closed after inactivity", no duration.
 
 ## Rejoin the same seat
 - `src/lib/reconnect.ts`: every player or spectator request stamps `last_seen_at` (at most every 10 s, `touchSeen` in
   `requireViewer`, `src/lib/server/room.ts`);
   re-joining with an existing nickname reclaims that seat (same player id, new token) from the same device
-  (`device_hash`, from the browser's `bingo:device` id) or once the seat has been unseen for 45 s, also mid-game.
+  (`device_hash`, from the browser's `bingo:device` id) or once the seat has been unseen for 301 s (`DISCONNECT_MS`), also mid-game.
   `/state` exposes only a derived `connected` flag ("deconectat" badge); never select `token_hash`/`device_hash`
   into `PLAYER_COLUMNS`.
 
@@ -63,6 +65,7 @@ Rules for schema changes:
 - Called numbers can never be un-ticked (`/mark` answers 409 for `marked: false` on a called number; the client ignores the tap).
 - "Show" count = `hintsPerRound(size)` in `game.ts` (5; 8x8 15, 9x9 20, 10x10 25).
 - `reportRound` (validate win, or last player wins after leaves) writes `hub_leaderboard` (player_key = lowercased nickname).
+  Rooms named `e2e-test-…` (E2E / UI tests) are skipped (`isTestRoom`, `leaderboard.test.ts`).
 
 ## Testing (GitHub Actions, manual only)
 All checks run in GitHub Actions on the free tier (public repo, standard `ubuntu-latest` runners only, never billed
@@ -72,7 +75,7 @@ Start one with `gh workflow run <file> --ref main`, then `gh run watch` (or the 
 | Workflow | Runs |
 | --- | --- |
 | `.github/workflows/check.yml` "Check code" | `npx next typegen` + `npx tsc --noEmit` (typegen first, so route types in `.next/types` are checked), `npx eslint src`, `npx next build`. Every step runs even if an earlier one failed |
-| `.github/workflows/unit-tests.yml` "Unit tests" | `npm test` (Vitest: `src/lib/game.test.ts`, `kick.test.ts`, `reconnect.test.ts`; pure logic, no DB) |
+| `.github/workflows/unit-tests.yml` "Unit tests" | `npm test` (Vitest, `vitest.config.ts` only adds the `@/` alias: `src/lib/game.test.ts`, `kick.test.ts`, `reconnect.test.ts` (pure logic), `src/lib/server/room.test.ts`, `leaderboard.test.ts` (DB and `server-only` mocked with `vi.mock`, no real DB)) |
 | `.github/workflows/e2e.yml` "E2E" | `node scripts/e2e.mjs <base_url>` (input, default production `https://games.hailatat.icu/classicbingo`); one run at a time |
 | `.github/workflows/e2e-ui.yml` "E2E UI (Playwright)" | `npx playwright test` (`playwright.config.ts`, tests in `tests/ui/*.e2e.ts`) against `base_url` (`E2E_BASE_URL`, default production), on desktop Chromium and an emulated iPhone 13 (WebKit). Same concurrency group as "E2E". On failure the report (traces, screenshots, videos) is uploaded as the `playwright-report` artifact |
 
@@ -88,7 +91,7 @@ Start one with `gh workflow run <file> --ref main`, then `gh run watch` (or the 
   enforced, leave mid-game (last one wins), lobby kick. Rooms are named `e2e-test-…` and deleted at the end; it never
   calls `/api/feedback`.
 - What E2E UI does (`tests/ui/`, shared steps in `helpers.ts`; every change must reach the other screens within 5 s
-  without a reload, polling is 15 s, so this checks Realtime):
+  without a reload, polling is 60 s, so this checks Realtime):
   - `game.e2e.ts` (both projects): two browser contexts (= two devices) create a 3x3 room, join by link, boards, ready,
     start, play to a validated win (marks get `data-state` "mine"/"marked"), BINGO pop-up, revealed cards, new round, leave.
   - `spectator.e2e.ts` (desktop Chromium only): a third person joins mid-game = spectator (no board, no player buttons),
