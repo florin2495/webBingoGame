@@ -7,6 +7,11 @@ const GAME = "bingo";
 /** Contract C: player_key = nickname, trimmed and lowercased (no accounts: same nickname = same person). */
 export const playerKey = (nickname: string) => nickname.trim().toLowerCase().slice(0, 40);
 
+/** Rooms created by the e2e tests (scripts/e2e.mjs, tests/ui) never reach the shared leaderboard. */
+export function isTestRoom(roomName: string): boolean {
+  return roomName.startsWith("e2e-test-");
+}
+
 /**
  * Reports a finished round to the hub leaderboard (hub_leaderboard, hub_leaderboard_rounds, owned by the hub):
  * +1 games for every participant, +1 wins for the winner(s). Idempotent per (game, room, round): the
@@ -15,6 +20,7 @@ export const playerKey = (nickname: string) => nickname.trim().toLowerCase().sli
  * The counters are read-then-written (no atomic increment in PostgREST), fine for a round-end event.
  */
 export async function reportRound(room: RoomRow, participantIds: string[], winnerIds: string[]): Promise<void> {
+  if (isTestRoom(room.name)) return;
   try {
     if (participantIds.length === 0) return;
     const { error: roundError } = await db()
