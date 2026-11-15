@@ -2,7 +2,7 @@
 // Rooms are named "e2e-test-ui-…"; a leftover is deleted with the service key (env) as a safety net.
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-/** A change has to show up on another screen within this, without a reload. Polling alone takes up to 15 s. */
+/** A change has to show up on another screen within this, without a reload. Polling alone takes up to 60 s. */
 export const REALTIME_MS = 5_000;
 
 export interface Player {

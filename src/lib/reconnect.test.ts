@@ -52,6 +52,6 @@ describe("seatClaim", () => {
 
 describe("seatBusyMessage", () => {
   it("names the player and the wait", () => {
-    expect(seatBusyMessage("Ana")).toBe("Ana e conectat acum. Dacă ești tu, închide celălalt tab sau așteaptă 45 de secunde.");
+    expect(seatBusyMessage("Ana")).toBe("Ana e conectat acum. Dacă ești tu, închide celălalt tab sau așteaptă 301 de secunde.");
   });
 });

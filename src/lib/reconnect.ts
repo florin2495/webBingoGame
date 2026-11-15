@@ -4,7 +4,7 @@
 // device or when the seat is disconnected. Pure, used by server and client.
 
 /** A seat not seen for this long is shown as "deconectat" and can be reclaimed from another device. */
-export const DISCONNECT_MS = 45_000;
+export const DISCONNECT_MS = 301_000;
 /** requireMember refreshes last_seen_at at most this often, to keep DB writes low. */
 export const LAST_SEEN_TOUCH_MS = 10_000;
 

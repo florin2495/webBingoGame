@@ -30,7 +30,7 @@ interface SeatRow {
 // Joining a room that already started (playing / finished) makes you a spectator (max MAX_SPECTATORS).
 // A nickname that already has a seat in the room reclaims that seat (same player id, board, marks, hints and
 // place in the turn order; new token) when the request comes from the same device or the seat has been
-// disconnected for 45 s - also mid-game.
+// disconnected for 301 s (DISCONNECT_MS) - also mid-game.
 export async function POST(req: Request, ctx: RouteContext<"/api/rooms/[code]/join">) {
   return handle(async () => {
     const { code } = await ctx.params;

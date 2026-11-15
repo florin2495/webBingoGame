@@ -4,7 +4,6 @@ import {
   hintsPerRound,
   isRoomAbandoned,
   isRoomExpired,
-  minutesLabel,
   ROOM_ABANDONED_MS,
   ROOM_IDLE_MINUTES,
 } from "@/lib/game";
@@ -19,7 +18,7 @@ import { enforceExpiredKicks } from "./kicks";
 const ROOM_COLUMNS =
   "id, code, name, password_hash, size, lines_to_win, status, round, turn_order, turn_offset, host_player_id, winner_player_id, last_activity_at";
 
-const GONE = `Camera nu există sau a fost închisă după ${minutesLabel(ROOM_IDLE_MINUTES)} de inactivitate.`;
+const GONE = "Camera nu există sau a fost închisă după inactivitate.";
 
 export function normalizeCode(code: string): string {
   const c = decodeURIComponent(code).trim().toUpperCase();

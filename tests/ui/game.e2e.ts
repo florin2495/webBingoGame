@@ -1,5 +1,5 @@
 // Scenario 1: two real browsers play a live game on the deployed site: create, join by link, boards, ready, start,
-// every call reaches the other player through Realtime (well under the 15 s polling fallback), marks, a validated
+// every call reaches the other player through Realtime (well under the 60 s polling fallback), marks, a validated
 // win, the BINGO pop-up, the revealed cards, a new round followed live, leave. Runs on every project.
 import { expect, test } from "@playwright/test";
 import { createRoom, joinRoom, leaveAll, playToWin, prepareAndStart, REALTIME_MS, withPlayers } from "./helpers";
